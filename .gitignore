@@ -1,0 +1,25 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+*.tsbuildinfo
+
+# Test coverage
+coverage/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Local env / secrets — credentials normally live in ~/.config/ai-intake-mcp/.env (decision #8 in
+# the plan doc), never in this repo, but ignore any that end up here anyway.
+.env
+.env.*
+# ...except the committed placeholder template install.sh copies from.
+!.env.example
+
+# OS cruft
+.DS_Store
+
+.idea/
