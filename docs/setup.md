@@ -141,14 +141,10 @@ the surface and should still prompt for confirmation:
 ```
 
 **Implementation sessions grant the agent full shell/`Edit` access** (unlike planning, which only
-ever needs the MCP tools above) — `ai-intake-mcp` has no code-level way to prevent a `git push` or
-merge during that session (implementation-phase plan, decision #10). If you want that guardrail,
-deny it explicitly, same opt-in-per-developer model as the allow-list above:
-
-```json
-{
-  "permissions": {
-    "deny": ["Bash(git push:*)", "Bash(git merge:*)"]
-  }
-}
-```
+ever needs the MCP tools above). `git push` and a local non-fast-forward `git merge` are blocked
+automatically — `worktree_create` installs a `pre-push`/`pre-merge-commit` guard scoped to that one
+worktree (hardening-phase plan, decision #1), so there's nothing to configure here yourself, and it
+works the same regardless of which agent CLI is driving. Two things it still can't reach: a
+**fast-forward** local merge (no merge commit is created, so the hook never fires) and a
+**remote-side** merge (`gh pr merge`, the GitHub UI) — neither is a local git operation any hook can
+intercept. Those stay a manual discipline, same as always.

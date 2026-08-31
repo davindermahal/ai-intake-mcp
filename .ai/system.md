@@ -44,9 +44,11 @@ file is a condensed reference, not a replacement for either.
 - **Sandboxing is mostly a property of the tools' own narrow implementation** — each tool does
   exactly one fixed, bounded thing (no arbitrary shell, no arbitrary Jira API access), so safety is
   uniform across developers regardless of their client's own permission settings. This holds fully
-  for planning; implementation work necessarily grants the agent real `Edit`/`Bash` access, which
-  this server has no code-level way to restrict (e.g. it can't prevent a `git push`) — that's an
-  accepted gap, covered by procedure-doc guidance and an opt-in settings snippet instead.
+  for planning; implementation work necessarily grants the agent real `Edit`/`Bash` access. `git
+  push` and a local non-fast-forward `git merge` are blocked anyway — `worktree_create` installs a
+  `pre-push`/`pre-merge-commit` guard scoped to that one worktree (hardening-phase plan, decision
+  #1) — but a fast-forward local merge and any remote-side merge (`gh pr merge`, the GitHub UI)
+  remain outside what a local git hook can reach, an accepted, permanent gap.
 - **Approval is a single, atomic action.** `approve_plan` is the only way a ticket reaches
   `state:implement` — it transitions Jira (gated on `state:review`) *then* flips the plan file's
   `Status` to `ready`, in that order, so a failed Jira call never leaves a plan file claiming an

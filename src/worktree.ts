@@ -1,6 +1,6 @@
 import { execFileSync } from "node:child_process";
-import { existsSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
 import { resolveRepoRoot } from "./repo-context.js";
 
 /** Worktree creation is pure git (decision #5) — no DB/container provisioning, no adapter contract. */
@@ -59,6 +59,49 @@ function existingWorktreePathFor(repoRoot: string, branch: string): string | und
     }
   }
   return undefined;
+}
+
+const HOOK_SCRIPTS: Record<string, string> = {
+  "pre-push": [
+    "#!/bin/sh",
+    `echo "ai-intake-mcp: git push is blocked in this managed worktree — push manually from a normal checkout after review." >&2`,
+    "exit 1",
+    "",
+  ].join("\n"),
+  "pre-merge-commit": [
+    "#!/bin/sh",
+    `echo "ai-intake-mcp: local merge is blocked in this managed worktree (run 'git merge --abort' to clean up if one is in progress) — merge manually from a normal checkout after review." >&2`,
+    "exit 1",
+    "",
+  ].join("\n"),
+};
+
+/**
+ * Blocks `git push` and any local non-fast-forward merge from inside this one worktree, without
+ * touching the developer's main checkout or any other worktree (implementation-phase plan decision
+ * #10, revisited by the hardening-phase plan — a settings-based permission deny-list only works for
+ * hosts with that model and is easy for a weaker/less-compliant executor to never have enabled).
+ *
+ * Git resolves a *relative* `core.hooksPath` against the worktree's working-tree root, not its
+ * private git dir — verified empirically while designing this — so this always writes an absolute
+ * path pointing into the worktree's own `git rev-parse --git-dir` (never the tracked working tree,
+ * so the hook scripts never land on the ticket branch itself). Idempotent: safe to call on every
+ * `worktreeCreate`, not just first creation.
+ *
+ * Known, permanent limits: a fast-forward merge creates no merge commit, so `pre-merge-commit` never
+ * fires for one (verified empirically) — same for `git merge --squash`. Neither hook can reach a
+ * remote-side merge (`gh pr merge`, GitHub's UI) — that was never a local git operation to begin
+ * with, so no local hook, in this design or any other, can intercept it.
+ */
+function installPushMergeGuard(worktreePath: string, repoRoot: string): void {
+  git(["config", "extensions.worktreeConfig", "true"], repoRoot);
+  const gitDir = resolve(worktreePath, git(["rev-parse", "--git-dir"], worktreePath));
+  const hooksDir = join(gitDir, "hooks-block");
+  mkdirSync(hooksDir, { recursive: true });
+  for (const [name, contents] of Object.entries(HOOK_SCRIPTS)) {
+    writeFileSync(join(hooksDir, name), contents, { mode: 0o755 });
+  }
+  git(["config", "--worktree", "core.hooksPath", hooksDir], worktreePath);
 }
 
 export interface WorktreeResult {
@@ -154,22 +197,23 @@ export async function worktreeCreate(
   const repoRoot = resolveRepoRoot(cwd);
   const branch = findExistingBranch(repoRoot, ticketKey) ?? `feature/${ticketKey}-${slugify(await resolveSummary())}`;
 
-  const existingPath = existingWorktreePathFor(repoRoot, branch);
-  if (existingPath) return { worktreePath: existingPath, branch };
+  let worktreePath = existingWorktreePathFor(repoRoot, branch);
+  if (!worktreePath) {
+    worktreePath = join(dirname(repoRoot), branch.replace(/\//g, "-"));
+    if (existsSync(worktreePath)) {
+      throw new Error(
+        `${worktreePath} already exists but isn't a registered worktree for ${branch} — refusing to overwrite.`,
+      );
+    }
 
-  const worktreePath = join(dirname(repoRoot), branch.replace(/\//g, "-"));
-  if (existsSync(worktreePath)) {
-    throw new Error(
-      `${worktreePath} already exists but isn't a registered worktree for ${branch} — refusing to overwrite.`,
-    );
+    if (branchExists(repoRoot, branch)) {
+      git(["worktree", "add", worktreePath, branch], repoRoot);
+    } else {
+      const base = resolveBaseBranch(repoRoot);
+      git(["worktree", "add", "-b", branch, worktreePath, base], repoRoot);
+    }
   }
 
-  if (branchExists(repoRoot, branch)) {
-    git(["worktree", "add", worktreePath, branch], repoRoot);
-  } else {
-    const base = resolveBaseBranch(repoRoot);
-    git(["worktree", "add", "-b", branch, worktreePath, base], repoRoot);
-  }
-
+  installPushMergeGuard(worktreePath, repoRoot);
   return { worktreePath, branch };
 }
