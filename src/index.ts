@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { readFileSync } from "node:fs";
+import { readFileSync, realpathSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
@@ -331,5 +331,28 @@ server.registerPrompt(
 
 // --- Start -----------------------------------------------------------------------------------
 
-const transport = new StdioServerTransport();
-await server.connect(transport);
+// `server` is exported so a test can drive it over an in-memory transport (hardening-phase plan,
+// decision #4) without ever reaching the real stdio connect below — real dev-machine credentials
+// only load lazily, inside a tool handler, so listing tools/prompts/resources never touches them.
+export { server };
+
+async function main(): Promise<void> {
+  const transport = new StdioServerTransport();
+  await server.connect(transport);
+}
+
+// Guards the real stdio connect to only the actual CLI entrypoint (`node .../dist/index.js`, the
+// only way this server is ever invoked — see docs/setup.md/install.sh, never via npm's `bin`
+// symlink) — not a plain `import` of this module, e.g. from a test. realpathSync on both sides
+// makes this robust to a symlinked invocation path, though the documented invocation never uses one.
+function isMainModule(): boolean {
+  try {
+    return realpathSync(process.argv[1] ?? "") === realpathSync(fileURLToPath(import.meta.url));
+  } catch {
+    return false;
+  }
+}
+
+if (isMainModule()) {
+  await main();
+}

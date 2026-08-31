@@ -30,7 +30,8 @@ ls .ai/plans/active/<TICKET-KEY>-*.md
 
 - **Match → refine, don't regenerate.** This is a re-pickup after the ticket bounced through
   `state:needs-input` and back. Read the existing plan, fold the developer's new answers into it, and
-  **accumulate** the Q&A — never overwrite from scratch.
+  **accumulate** the Q&A — never overwrite from scratch. Folding an answer in means flipping that
+  question's `- [ ]` to `- [x]` (see "Open Questions format" below), not deleting the line.
 - **No match → create** a new plan file. Derive `<slug>` as kebab-case of the ticket summary.
 
 ### Plan file shape
@@ -79,6 +80,17 @@ implementer's judgment to fill gaps:
 - **Prefer many small steps over few clever ones.** A judgment call either gets decided in the plan
   (record it under Key decisions) or goes to Open Questions — never left implicit.
 
+### `## Open Questions` format — required, checked by `approve_plan`
+
+Every item, blocking or not, is a GitHub-style task-list line: `- [ ]` while unresolved, `- [x]`
+once resolved. `approve_plan` parses this and **refuses to approve while any `- [ ]` item remains**
+— including a non-blocking "confirm at review" note (§3). That's the point: it forces whoever
+reviews the plan to actually engage with each open item (edit the plan to check it off, accepting the
+noted default, rather than approving with something silently unaddressed). Resolving an item means
+flipping `[ ]` → `[x]` in place — never delete the line; it's the plan's own record of what was
+raised and how it was settled, the same audit-trail habit this project's own dogfooding plans already
+keep as a separate "Resolved" section.
+
 ## 3. Decide: questions vs. clean
 
 Judge whether **Open Questions** contains anything that genuinely blocks a confident plan — an
@@ -95,9 +107,10 @@ never happens here — these go to `state:needs-input` regardless of how reasona
 - **Public contract changes** — new/changed/removed routes or URLs, or a change to a public
   API/response shape.
 
-State your recommended option in the question so the author can confirm with a one-word reply.
-Non-structural ambiguities you can settle from the codebase or a safe default stay `clean` (note them
-under Open Questions as "confirm at review" instead of blocking on them).
+State your recommended option in the question so the author can confirm with a one-word reply,
+written as `- [ ]` (see above). Non-structural ambiguities you can settle from the codebase or a safe
+default stay `clean` (note them under Open Questions as `- [ ]` "confirm at review" instead of
+blocking on them — the reviewer checks them off, or reopens one, before calling `approve_plan`).
 
 ## 4. Commit the plan file
 

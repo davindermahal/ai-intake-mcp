@@ -14,6 +14,11 @@ export function resolveRepoRoot(cwd: string = process.cwd()): string {
 export interface RepoConfig {
   jiraProjectKey: string;
   appTag: string;
+  /** Which of the fixed `install`/`build`/`test`/`lint` targets this project's Makefile genuinely
+   * doesn't define — an explicit declaration, not a silent inference (hardening-phase plan, decision
+   * #3). Optional; a project with no such gaps just omits it. Not written by `write_repo_config` —
+   * an agent/developer edits this file directly, the same way `.ai/intake-mcp.md` is hand-maintained. */
+  skipTargets?: string[];
 }
 
 function configPath(repoRoot: string): string {
@@ -36,6 +41,16 @@ export function readRepoConfig(repoRoot: string): RepoConfig | undefined {
       : undefined;
   if (typeof jiraProjectKey !== "string" || typeof appTag !== "string") {
     throw new Error(`${path} is malformed — expected { "jiraProjectKey": string, "appTag": string }.`);
+  }
+  const rawSkipTargets =
+    typeof parsed === "object" && parsed !== null && "skipTargets" in parsed
+      ? (parsed as { skipTargets: unknown }).skipTargets
+      : undefined;
+  if (rawSkipTargets !== undefined) {
+    if (!Array.isArray(rawSkipTargets) || !rawSkipTargets.every((t) => typeof t === "string")) {
+      throw new Error(`${path} is malformed — "skipTargets" must be an array of strings.`);
+    }
+    return { jiraProjectKey, appTag, skipTargets: rawSkipTargets };
   }
   return { jiraProjectKey, appTag };
 }

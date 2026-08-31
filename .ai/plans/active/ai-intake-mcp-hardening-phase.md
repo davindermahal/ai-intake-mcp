@@ -173,12 +173,29 @@ Grouped by how testable they actually are:
   instead of trusting the agent's own shell), a materially larger architecture change than this
   phase's scope. Named explicitly in decision #3 above so it isn't mistaken for solved.
 
-## Open questions
+## Resolved during implementation
 
-1. **Exact resolution of `core.hooksPath`'s path semantics for a git worktree** — needs a small
-   phase-1 spike (does git resolve a relative `core.hooksPath` against the worktree's top directory
-   or its private git dir?) before locking down whether the plan writes an absolute or relative path.
-   Not blocking approval of this plan — an implementation detail phase 1 resolves directly.
-2. **`src/index.ts` test approach** — genuinely undecided until the phase-4 spike into
-   `@modelcontextprotocol/sdk`'s in-memory transport capabilities; the plan intentionally leaves both
-   the in-memory-transport and smoke-test fallback on the table rather than picking one blind.
+1. **`core.hooksPath` path semantics — relative is broken, absolute is required.** Verified
+   empirically with a throwaway repo+worktree: a *relative* `core.hooksPath` set at `--worktree`
+   scope resolves against the worktree's **working-tree root**, not its private git dir — so a hook
+   placed under the private git dir and referenced by a relative path is silently never found, and
+   `git push`/`git merge` succeed as if no guard existed at all. `installPushMergeGuard`
+   (`src/worktree.ts`) always writes an absolute path. Also confirmed empirically: a fast-forward
+   merge genuinely never invokes `pre-merge-commit` (no merge commit is created), matching the
+   documented limitation exactly.
+2. **`src/index.ts` test approach — the in-memory-transport approach works, once one thing changed.**
+   `src/index.ts` unconditionally called `await server.connect(new StdioServerTransport())` at
+   module scope, so merely *importing* the module for a test would have attached real listeners to
+   the test process's actual `process.stdin`. Fixed by exporting `server` and gating the real
+   stdio-connect behind an `isMainModule()` check (`realpathSync(process.argv[1]) ===
+   realpathSync(fileURLToPath(import.meta.url))`) — true only for the real, documented invocation
+   (`node .../dist/index.js`, per `docs/setup.md`/`install.sh`; this project never runs it via npm's
+   `bin` symlink, so the realpath comparison is not just a defensive nicety here, it always matches).
+   With that gate in place, `test/index.test.ts` connects a real `Client` to the real `server` over
+   `InMemoryTransport.createLinkedPair()` and calls `listTools`/`listPrompts`/`listResources` —
+   metadata-only calls that never invoke a handler, so real Jira credentials are never touched.
+3. **A pre-existing gap the phase-4 auth-cookie tests exposed, not introduced**: the dev
+   `Dockerfile` never installed `libsecret-1-0`, keytar's native-binding runtime dependency on
+   Linux — `make test` failed with "libsecret-1.so.0: cannot open shared object file" the moment any
+   test imported `src/jira/auth-cookie.ts` at all (even fully mocked), because keytar loads its
+   native binding at import time regardless of whether it's ever called. Added to the `Dockerfile`.

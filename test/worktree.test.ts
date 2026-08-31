@@ -59,6 +59,49 @@ describe("worktreeCreate", () => {
   });
 });
 
+describe("push/merge guard installed by worktreeCreate", () => {
+  it("blocks git push from inside the worktree", async () => {
+    const created = await worktreeCreate("DAV-5", async () => "Fix the thing", repoRoot);
+    execFileSync("git", ["commit", "--allow-empty", "-m", "work"], { cwd: created.worktreePath });
+
+    expect(() =>
+      git(["push", repoRoot, `${created.branch}:refs/heads/pushed-from-guarded-worktree`], created.worktreePath),
+    ).toThrow();
+    expect(() =>
+      git(["rev-parse", "--verify", "--quiet", "refs/heads/pushed-from-guarded-worktree"], repoRoot),
+    ).toThrow();
+  });
+
+  it("blocks a non-fast-forward local merge from inside the worktree", async () => {
+    const created = await worktreeCreate("DAV-5", async () => "Fix the thing", repoRoot);
+    execFileSync("git", ["commit", "--allow-empty", "-m", "wt work"], { cwd: created.worktreePath });
+    git(["commit", "--allow-empty", "-m", "main work"], repoRoot); // repoRoot sits on "main"
+
+    expect(() => git(["merge", "main"], created.worktreePath)).toThrow();
+  });
+
+  it("does not block a fast-forward local merge (documented limitation)", async () => {
+    const created = await worktreeCreate("DAV-5", async () => "Fix the thing", repoRoot);
+    git(["commit", "--allow-empty", "-m", "main work"], repoRoot); // worktree branch has no divergent commits
+
+    expect(git(["merge", "main"], created.worktreePath)).toMatch(/Fast-forward/);
+  });
+
+  it("does not touch the main checkout's own hooksPath", async () => {
+    await worktreeCreate("DAV-5", async () => "Fix the thing", repoRoot);
+    expect(() => git(["config", "--get", "core.hooksPath"], repoRoot)).toThrow();
+  });
+
+  it("stays installed across a repeated worktreeCreate call", async () => {
+    await worktreeCreate("DAV-5", async () => "Fix the thing", repoRoot);
+    const second = await worktreeCreate("DAV-5", async () => "Fix the thing", repoRoot);
+
+    expect(() =>
+      git(["push", repoRoot, `${second.branch}:refs/heads/still-blocked`], second.worktreePath),
+    ).toThrow();
+  });
+});
+
 describe("findWorktreeForTicket", () => {
   it("returns undefined when no branch exists for the ticket", () => {
     expect(findWorktreeForTicket("DAV-5", repoRoot)).toBeUndefined();

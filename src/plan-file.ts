@@ -7,6 +7,9 @@ import { join } from "node:path";
 const STATUS_LINE = /^(\*\*Status\*\*:)\s*.*$/m;
 const UPDATED_LINE = /^(\*\*Updated\*\*:)\s*.*$/m;
 const BOUNDARIES_HEADING = /^##\s+Boundaries\s*$/m;
+const OPEN_QUESTIONS_HEADING = /^##\s+Open Questions\s*$/m;
+const NEXT_HEADING = /^##\s+\S/m;
+const UNCHECKED_TASK_ITEM = /^-\s*\[\s\]/m;
 
 /** Finds `.ai/plans/active/<ticketKey>-*.md` inside a worktree. Undefined if none exists. */
 export function findPlanFile(worktreePath: string, ticketKey: string): string | undefined {
@@ -37,6 +40,23 @@ export function readPlanStatus(planPath: string): string {
 export function planHasBoundariesSection(planPath: string): boolean {
   const content = readFileSync(planPath, "utf8");
   return BOUNDARIES_HEADING.test(content);
+}
+
+/** True if the plan file's `## Open Questions` section has any unresolved `- [ ]` item.
+ * `docs/planning-procedure.md` requires every Open Questions item — blocking or a non-blocking
+ * "confirm at review" note alike — to be written as a `- [ ]`/`- [x]` task-list line;
+ * `approve_plan` refuses to approve while any `- [ ]` remains, closing the gap where a plan reached
+ * `state:review` with something still unaddressed and the human approving it never noticed. No
+ * `## Open Questions` heading at all means nothing to resolve — not itself an approval blocker (that
+ * would duplicate the `## Boundaries` check's job for an unrelated section). */
+export function planHasUnresolvedOpenQuestions(planPath: string): boolean {
+  const content = readFileSync(planPath, "utf8");
+  const heading = OPEN_QUESTIONS_HEADING.exec(content);
+  if (!heading) return false;
+  const rest = content.slice(heading.index + heading[0].length);
+  const nextHeading = NEXT_HEADING.exec(rest);
+  const section = nextHeading ? rest.slice(0, nextHeading.index) : rest;
+  return UNCHECKED_TASK_ITEM.test(section);
 }
 
 /** Sets the plan file's `**Status**:` and bumps `**Updated**:` to today (UTC date). */
