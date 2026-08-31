@@ -59,8 +59,23 @@ implementer's judgment to fill gaps:
   not a step; "In `src/Controller/EventController.php`, add … then run `<exact test command>`" is.
 - **Every step ends with an acceptance check** — one command or one concrete observation, plus the
   expected pass output.
-- **Add a `## Boundaries` section**: files/directories the implementer must not touch, plus any
-  standing rules that apply.
+- **`## Boundaries` is required on every plan — never omit it, even when nothing seems off-limits.**
+  A missing or vague Boundaries section is a planning defect, not something the implementer should
+  paper over; `docs://implementation-procedure` will refuse to proceed without one. It must state,
+  explicitly and concretely:
+  - **Files/directories the implementer must not touch** — real paths or globs, not "core files" or
+    other vague language. If genuinely nothing is off-limits, say so outright ("Boundaries: none —
+    full repo is in scope") rather than leaving the section thin or absent.
+  - **What the implementer must not add on its own initiative**: new dependencies, new
+    abstractions/helpers not named in a step, refactors of code the plan didn't ask to touch, tests
+    beyond what a step specifies, and config/build/CI changes not listed under Files to change.
+  - **Explicit stop conditions** — name the situations where the implementer must stop and report
+    (§5 of `docs://implementation-procedure`) instead of guessing: an acceptance check that still
+    fails after one fix attempt, a step that turns out to need a file outside Files to change, or any
+    ambiguity this plan doesn't already resolve under Key decisions.
+  - **A standing rule that Boundaries wins even when crossing it looks like the easier or more
+    "correct" fix** — the implementer raises it (Open Questions / stop-and-report) instead of judging
+    its way past the fence.
 - **Prefer many small steps over few clever ones.** A judgment call either gets decided in the plan
   (record it under Key decisions) or goes to Open Questions — never left implicit.
 

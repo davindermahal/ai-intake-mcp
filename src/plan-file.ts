@@ -6,6 +6,7 @@ import { join } from "node:path";
 
 const STATUS_LINE = /^(\*\*Status\*\*:)\s*.*$/m;
 const UPDATED_LINE = /^(\*\*Updated\*\*:)\s*.*$/m;
+const BOUNDARIES_HEADING = /^##\s+Boundaries\s*$/m;
 
 /** Finds `.ai/plans/active/<ticketKey>-*.md` inside a worktree. Undefined if none exists. */
 export function findPlanFile(worktreePath: string, ticketKey: string): string | undefined {
@@ -28,6 +29,14 @@ export function readPlanStatus(planPath: string): string {
     throw new Error(`${planPath} has no **Status**: line — malformed plan file.`);
   }
   return match[0].replace(/^\*\*Status\*\*:/, "").trim();
+}
+
+/** True if the plan file has a `## Boundaries` heading. `docs/planning-procedure.md` requires every
+ * plan to have one; `implement_ticket` refuses to hand off implementation to a plan without one
+ * (docs/implementation-procedure.md) rather than let an executor treat its absence as "no limits". */
+export function planHasBoundariesSection(planPath: string): boolean {
+  const content = readFileSync(planPath, "utf8");
+  return BOUNDARIES_HEADING.test(content);
 }
 
 /** Sets the plan file's `**Status**:` and bumps `**Updated**:` to today (UTC date). */

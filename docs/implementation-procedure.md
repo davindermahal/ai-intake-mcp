@@ -19,6 +19,12 @@ worker, no poller-owned result file — you implement the plan yourself and repo
 - **Stay in scope.** Build only what the plan's Scope/Implementation order describes. If the plan is
   ambiguous or you hit something needing a human decision, stop and report it (§5) rather than
   guessing or expanding scope.
+- **A plan without a `## Boundaries` section is not implementable as written.** `implement_ticket`
+  enforces this and refuses to hand off (you'll see its error instead of ever reaching this doc) —
+  but if you ever find yourself implementing without one regardless (e.g. a Boundaries heading
+  added after the check, then removed), stop, don't interpret its absence as "no limits" or write
+  one yourself, and treat it as blocked (§5) until the developer adds one via `plan_ticket`/
+  `docs://planning-procedure`.
 - **Do not read or exfiltrate secrets** (`.env`, `~/.config/ai-intake-mcp/.env`, API keys, etc.).
 
 ## 0. What's already happened
@@ -66,11 +72,15 @@ you go.
   and don't add work the plan doesn't ask for. If a step names exact files and commands, touch those
   files and run those commands.
 - **Run each step's acceptance check before starting the next step.** If a check fails, re-read the
-  step and fix your change; don't continue past a failing check.
-- **Respect the plan's `Scope` → "Out" / `Boundaries` section**, if present — never modify files/dirs
-  it fences off, even if that looks like the easier fix.
-- **Stop and report instead of improvising** on the first failure you can't fix within the step's own
-  scope. A precise partial result beats an inventive wrong one — see §5.
+  step and fix your change; don't continue past a failing check. A check that still fails after one
+  fix attempt is a stop condition, not something to retry indefinitely or route around.
+- **Treat the plan's `Scope` → "Out" and `Boundaries` sections as hard fences, not suggestions.**
+  Never touch a file/directory they name, never add a dependency, abstraction, refactor, test, or
+  config/build/CI change they don't call for — even when it looks like the easier or more "correct"
+  fix. If a Boundaries stop condition is met, stop there; don't first try to work around it.
+- **When in doubt about whether something is in scope, it's out of scope.** Stop and report (§5)
+  rather than using judgment to fill the gap — that judgment call belongs to the plan's author, not
+  the implementer.
 
 ## 4. Build & verify — `make` targets, not ad hoc commands
 

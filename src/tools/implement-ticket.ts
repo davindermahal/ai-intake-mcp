@@ -1,7 +1,7 @@
 import type { GlobalConfig } from "../config.js";
 import type { JiraClient } from "../jira/client.js";
 import { STATE_LABEL, currentStateLabel, fetchIssue, transitionState } from "../jira/tags.js";
-import { findPlanFile, readPlanStatus } from "../plan-file.js";
+import { findPlanFile, planHasBoundariesSection, readPlanStatus } from "../plan-file.js";
 import { worktreeCreateTool } from "./worktree-create.js";
 
 export interface ImplementTicketResult {
@@ -39,6 +39,12 @@ export async function implementTicketTool(
     throw new Error(
       `Plan for ${ticketKey} is "${status}" — must be "ready" (call approve_plan first) or "active" ` +
         `(a resumed run) before implementing.`,
+    );
+  }
+  if (!planHasBoundariesSection(planPath)) {
+    throw new Error(
+      `Plan for ${ticketKey} (${planPath}) has no "## Boundaries" section — refusing to implement. ` +
+        `Boundaries are required (docs://planning-procedure); add one via plan_ticket before implementing.`,
     );
   }
 

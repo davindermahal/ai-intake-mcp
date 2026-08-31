@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { findPlanFile, readPlanStatus, setPlanStatus } from "../src/plan-file.js";
+import { findPlanFile, planHasBoundariesSection, readPlanStatus, setPlanStatus } from "../src/plan-file.js";
 
 let dir: string;
 
@@ -52,6 +52,29 @@ describe("readPlanStatus", () => {
     const path = join(dir, "malformed.md");
     writeFileSync(path, "# no status line here\n", "utf8");
     expect(() => readPlanStatus(path)).toThrow(/no \*\*Status\*\*/);
+  });
+});
+
+describe("planHasBoundariesSection", () => {
+  it("returns false when the plan has no Boundaries heading", () => {
+    const path = writePlan("ready");
+    expect(planHasBoundariesSection(path)).toBe(false);
+  });
+
+  it("returns true when the plan has a Boundaries heading", () => {
+    const path = writePlan("ready");
+    writeFileSync(path, `${readFileSync(path, "utf8")}\n## Boundaries\n\nDo not touch tests/.\n`, "utf8");
+    expect(planHasBoundariesSection(path)).toBe(true);
+  });
+
+  it("does not match a mid-sentence mention of 'Boundaries'", () => {
+    const path = writePlan("ready");
+    writeFileSync(
+      path,
+      `${readFileSync(path, "utf8")}\nStay within the Boundaries described in the ticket.\n`,
+      "utf8",
+    );
+    expect(planHasBoundariesSection(path)).toBe(false);
   });
 });
 
