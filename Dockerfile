@@ -14,7 +14,11 @@ FROM node:24-bookworm
 
 # git is required at runtime by worktree_create (git worktree add) and by the server's own
 # repo-root resolution (git rev-parse --show-toplevel), so tests exercising that logic need it too.
-RUN apt-get update && apt-get install -y --no-install-recommends git \
+# libsecret-1-0 is keytar's native-binding runtime dependency on Linux (the OS keyring backend for
+# the cookie-auth fallback, src/jira/auth-cookie.ts) — without it, keytar throws
+# "libsecret-1.so.0: cannot open shared object file" merely importing the module, which any test
+# touching auth-cookie.ts (even via fakes) hits at import time.
+RUN apt-get update && apt-get install -y --no-install-recommends git libsecret-1-0 \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /workspace
