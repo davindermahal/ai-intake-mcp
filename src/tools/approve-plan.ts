@@ -1,7 +1,7 @@
 import type { GlobalConfig } from "../config.js";
 import type { JiraClient } from "../jira/client.js";
 import { STATE_LABEL, currentStateLabel, fetchIssue, transitionState } from "../jira/tags.js";
-import { findPlanFile, readPlanStatus, setPlanStatus } from "../plan-file.js";
+import { findPlanFile, planHasUnresolvedOpenQuestions, readPlanStatus, setPlanStatus } from "../plan-file.js";
 import { findWorktreeForTicket } from "../worktree.js";
 
 export interface ApprovePlanResult {
@@ -34,6 +34,12 @@ export async function approvePlanTool(
   const status = readPlanStatus(planPath);
   if (status !== "draft") {
     throw new Error(`Plan for ${ticketKey} is "${status}", not "draft" — refusing to approve.`);
+  }
+  if (planHasUnresolvedOpenQuestions(planPath)) {
+    throw new Error(
+      `Plan for ${ticketKey} (${planPath}) has unresolved "- [ ]" items under "## Open Questions" ` +
+        `— refusing to approve. Resolve or explicitly check off each one (flip to "- [x]") first.`,
+    );
   }
 
   const issue = await fetchIssue(client, ticketKey);

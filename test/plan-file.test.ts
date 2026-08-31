@@ -2,7 +2,13 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { findPlanFile, planHasBoundariesSection, readPlanStatus, setPlanStatus } from "../src/plan-file.js";
+import {
+  findPlanFile,
+  planHasBoundariesSection,
+  planHasUnresolvedOpenQuestions,
+  readPlanStatus,
+  setPlanStatus,
+} from "../src/plan-file.js";
 
 let dir: string;
 
@@ -75,6 +81,49 @@ describe("planHasBoundariesSection", () => {
       "utf8",
     );
     expect(planHasBoundariesSection(path)).toBe(false);
+  });
+});
+
+describe("planHasUnresolvedOpenQuestions", () => {
+  it("returns false when there is no Open Questions heading", () => {
+    const path = writePlan("ready");
+    expect(planHasUnresolvedOpenQuestions(path)).toBe(false);
+  });
+
+  it("returns false when the section has only checked items", () => {
+    const path = writePlan("ready");
+    writeFileSync(
+      path,
+      `${readFileSync(path, "utf8")}\n## Open Questions\n\n- [x] Confirmed default retry count.\n`,
+      "utf8",
+    );
+    expect(planHasUnresolvedOpenQuestions(path)).toBe(false);
+  });
+
+  it("returns true when an unchecked item remains", () => {
+    const path = writePlan("ready");
+    writeFileSync(
+      path,
+      `${readFileSync(path, "utf8")}\n## Open Questions\n\n- [x] Resolved one.\n- [ ] Still open.\n`,
+      "utf8",
+    );
+    expect(planHasUnresolvedOpenQuestions(path)).toBe(true);
+  });
+
+  it("returns false when the section is empty", () => {
+    const path = writePlan("ready");
+    writeFileSync(path, `${readFileSync(path, "utf8")}\n## Open Questions\n\nNone.\n`, "utf8");
+    expect(planHasUnresolvedOpenQuestions(path)).toBe(false);
+  });
+
+  it("ignores an unchecked item that appears after a later heading", () => {
+    const path = writePlan("ready");
+    writeFileSync(
+      path,
+      `${readFileSync(path, "utf8")}\n## Open Questions\n\n- [x] Resolved.\n\n## Boundaries\n\n- [ ] not a real task item, just prose that happens to look like one\n`,
+      "utf8",
+    );
+    expect(planHasUnresolvedOpenQuestions(path)).toBe(false);
   });
 });
 

@@ -135,6 +135,36 @@ describe("approvePlanTool", () => {
     expect(fetchImpl).not.toHaveBeenCalled();
   });
 
+  it("refuses when the plan has an unresolved Open Questions item", async () => {
+    writeFileSync(
+      planPath,
+      "# Plan: DAV-5 Fix the thing\n\n**Status**: draft\n**Branch**: feature/DAV-5-fix-the-thing\n**Created**: 2026-01-01\n**Updated**: 2026-01-01\n\n## Open Questions\n\n- [ ] Still open.\n",
+      "utf8",
+    );
+    const fetchImpl = vi.fn();
+    await expect(approvePlanTool(makeClient(fetchImpl), config, "DAV-5", repoRoot)).rejects.toThrow(
+      /unresolved "- \[ \]" items/,
+    );
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it("approves once every Open Questions item is checked off", async () => {
+    writeFileSync(
+      planPath,
+      "# Plan: DAV-5 Fix the thing\n\n**Status**: draft\n**Branch**: feature/DAV-5-fix-the-thing\n**Created**: 2026-01-01\n**Updated**: 2026-01-01\n\n## Open Questions\n\n- [x] Resolved.\n",
+      "utf8",
+    );
+    const fetchImpl = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("/issue/DAV-5?")) return issueResponse(["state:review"]);
+      if (url.endsWith("/myself")) return jsonResponse({ accountId: ISSUE_ME });
+      return jsonResponse(undefined, 204);
+    });
+
+    const result = await approvePlanTool(makeClient(fetchImpl), config, "DAV-5", repoRoot);
+    expect(result).toEqual({ planPath, transitionedTo: "implement" });
+  });
+
   it("refuses when no worktree exists for the ticket", async () => {
     const fetchImpl = vi.fn();
     await expect(approvePlanTool(makeClient(fetchImpl), config, "DAV-9", repoRoot)).rejects.toThrow(
