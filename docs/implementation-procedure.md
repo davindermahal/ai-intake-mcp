@@ -99,10 +99,16 @@ it down if that file doesn't exist):
 - `make exec CMD="<command>"` — the generic passthrough for anything not covered above (installing a
   new dependency mid-implementation, a one-off framework command).
 
-**A target the project genuinely doesn't have (e.g. no `lint` step for a docs-only repo) is skipped
-silently** — don't invent a target that isn't there. **A target that exists and fails is not**: every
-declared target must pass for this to count as a successful implementation. If one fails and you
-can't fix it, that's the stop-and-report case in §5, not a partial success.
+**A target the project genuinely doesn't have (e.g. no `lint` step for a docs-only repo) must be
+declared, not silently assumed** — add its name to `.ai/intake-mcp.json`'s `skipTargets` array
+(create the array if it doesn't exist) rather than just skipping it and moving on.
+`tracker_transition(..., "verify")` cross-checks `skipTargets` against the project's `Makefile` and
+refuses the transition if a target you declared skipped is actually defined there (hardening-phase
+plan, decision #3) — a real, catchable contradiction, but not a substitute for actually checking: it
+can't verify that a target which *does* exist was actually run and passed, only that a claimed-absent
+one isn't obviously present. **A target that exists and fails is never skipped**: every declared
+target must pass for this to count as a successful implementation. If one fails and you can't fix it,
+that's the stop-and-report case in §5, not a partial success.
 
 Also run the plan's own acceptance checks — whatever it specifies beyond the standard targets.
 
