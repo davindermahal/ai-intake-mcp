@@ -1,6 +1,6 @@
 # Plan: `ai-intake-mcp` — hardening phase (guardrails + coverage gaps)
 
-**Status**: ready
+**Status**: completed
 **Created**: 2026-08-30
 **Updated**: 2026-08-30
 **Related**: `.ai/plans/active/ai-intake-mcp-implementation-phase.md` (decision #10, "explicitly out of
@@ -199,3 +199,24 @@ Grouped by how testable they actually are:
    Linux — `make test` failed with "libsecret-1.so.0: cannot open shared object file" the moment any
    test imported `src/jira/auth-cookie.ts` at all (even fully mocked), because keytar loads its
    native binding at import time regardless of whether it's ever called. Added to the `Dockerfile`.
+
+## Dogfood (2026-08-30)
+
+Merged to `main` locally (`c990dbc`), then live-verified against DAV-5's real, pre-existing worktree
+(predates this plan) and pushed to `origin/main`:
+
+- `worktree_create` installed the push/merge guard on that worktree for the first time, confirming
+  it's genuinely idempotent-on-resume, not just on fresh creation.
+- `git push` from that worktree confirmed blocked for real (against a throwaway local remote —
+  `origin` was never touched, verified via `git ls-remote` before/after).
+- The `skipTargets`/Makefile contradiction check confirmed refusing `tracker_transition(...,
+  "verify")` for real (temporarily added a genuine contradiction, confirmed zero Jira calls made on
+  refusal, reverted, confirmed the normal path still transitions cleanly).
+- The merge-block attempt hit `git`'s own "refusing to merge unrelated histories" — a side effect of
+  this session's earlier, unrelated history-squash of `main`, not a guard defect; aborted cleanly.
+  Already covered by clean, related-history throwaway repos in `test/worktree.test.ts`.
+- The `approve_plan` Open-Questions gate (decision #2) was **not** re-exercised live — already
+  covered thoroughly by automated tests against real plan-file fixtures; didn't want to cycle a real
+  ticket's state through `needs-input`/`review` and back just to re-prove it live.
+
+Summary comment posted to DAV-5 (comment `11371`); ticket's own state left unchanged (`state:verify`).

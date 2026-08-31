@@ -355,6 +355,11 @@ exercised by v1's checkpoint (v1 explicitly scoped its check to `needs-input`/`r
   Stops at `state:verify`, same boundary the harness's own headless worker stops at.
 - **Enforced (code-level) prevention of `git push`/merge during an implementation session** —
   decision #10. Procedure-doc guidance + an opt-in settings snippet only.
+  **Revisited**: `.ai/plans/active/ai-intake-mcp-hardening-phase.md` (2026-08-30), decision #1 —
+  `worktree_create` now installs a per-worktree `pre-push`/`pre-merge-commit` git hook that actually
+  blocks `git push` and a local non-fast-forward merge, regardless of which agent CLI is driving. A
+  fast-forward local merge and any remote-side merge (`gh pr merge`, GitHub's UI) remain unreachable
+  by any local mechanism — that part of decision #10 still stands.
 - **Multi-service / docker-compose-style orchestration** — not attempted even optionally; a project
   needing more than "run this `make` target" belongs to that project's own tooling.
 - **Any change to `ai-intake-harness` itself** — unchanged from the v1 plan's own boundary.
@@ -400,16 +405,26 @@ exercised by v1's checkpoint (v1 explicitly scoped its check to `needs-input`/`r
 
 ## Remaining open
 
+Both items below were resolved by `.ai/plans/active/ai-intake-mcp-hardening-phase.md` (2026-08-30) —
+kept here, unresolved wording included, as the record of what was originally left open and why.
+
 - **Whether `approve_plan` should also verify the plan file has no unresolved Open Questions** before
   allowing the `state:review → state:implement` transition — the harness's human approval step
   implicitly does this (a person reads the plan before moving it), but `approve_plan` itself doesn't
   parse the plan file's content today, only its `Status` field. Worth deciding in phase 1 whether
   that's an acceptable trust boundary (the human calling `approve_plan` already read the plan) or a
   gap worth closing.
+  **Resolved**: yes, close the gap. Hardening-phase plan, decision #2 — `## Open Questions` items are
+  now `- [ ]`/`- [x]` task-list lines, and `approve_plan` refuses while any `- [ ]` remains.
 - **How prescriptive `docs://implementation-procedure` should be when a project's `.ai/intake-mcp.md`
   says a standard target (decision #2) genuinely doesn't apply** (e.g. a docs-only repo with no
   `lint` target) — skip silently, or note it in the completion comment? Leaning toward "skip
   silently, only note declared-but-failing targets," but not decided — revisit in phase 3.
+  **Resolved**: require explicit declaration, not silent skip. Hardening-phase plan, decision #3 —
+  `.ai/intake-mcp.json`'s `skipTargets` field, cross-checked against the real `Makefile` at the
+  `verify` transition. Can't verify a non-skipped target was actually run, only that a claimed-skip
+  isn't contradicted by the Makefile — documented as a permanent limit, not oversold as closing the
+  full gap.
 
 ## Related idea raised in review, not part of this plan
 

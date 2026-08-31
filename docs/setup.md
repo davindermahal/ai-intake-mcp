@@ -36,6 +36,15 @@ cd ~/dev/ai-intake-mcp && npm install && npm run build
 
 To pick up updates later: `git pull && ./install.sh` in that same clone.
 
+**Rebuilding isn't enough on its own for a session that's already running.** `ai-intake-mcp` is a
+local stdio process — once your agent CLI has spawned it, that process keeps running the code it
+started with; Node doesn't hot-reload, and re-running `claude mcp add`/`gemini mcp add` only rewrites
+the *registration*, it doesn't kill/restart an already-connected server (confirmed empirically: a
+rebuild mid-session left the live tools running the old code until the connection was explicitly
+reconnected). A **new** session started after `git pull && ./install.sh` picks up the update
+automatically, since it spawns a fresh process — but any session you already have open needs its
+`ai-intake-mcp` MCP connection reconnected (or the session restarted) before it reflects the update.
+
 ## 2. Register the server at user scope
 
 Register once, not per-project — a local stdio MCP server inherits the cwd of whatever agent CLI
