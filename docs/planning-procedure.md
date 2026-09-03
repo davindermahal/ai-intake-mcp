@@ -46,9 +46,9 @@ ls .ai/plans/active/<TICKET-KEY>-*.md
 ```
 
 Then: **Goal**, **Scope** (in/out), **Files to change** (one-line reason each), **Key decisions**,
-**Implementation order**, **Boundaries**, **Open Questions**. Leave `**Status**: draft` — flipping to
-`ready` happens via the `approve_plan` tool, a separate human decision this planning session never
-makes itself.
+**Implementation order**, **Testing strategy**, **Boundaries**, **Open Questions**. Leave
+`**Status**: draft` — flipping to `ready` happens via the `approve_plan` tool, a separate human
+decision this planning session never makes itself.
 
 ### Write for a weaker executor
 
@@ -79,6 +79,35 @@ implementer's judgment to fill gaps:
     its way past the fence.
 - **Prefer many small steps over few clever ones.** A judgment call either gets decided in the plan
   (record it under Key decisions) or goes to Open Questions — never left implicit.
+
+### `## Testing strategy` — required, test-first (TDD)
+
+Verification is never an afterthought bolted on once code exists — every plan is written test-first.
+For each Implementation order step that changes behavior, split it into a paired test step and
+implementation step rather than one combined step:
+
+1. **Test step** — write the test(s) for that unit of behavior *before* the code exists to satisfy
+   them. At minimum, one test for the intended (passing) behavior; where a failure/error path is
+   meaningful (invalid input, a boundary condition, an error the code must handle), at least one test
+   for that path too — a step that only tests happy paths is incomplete. The step's acceptance check
+   is that the new test(s) **fail against the current code, for the expected reason** (red) — this is
+   what proves the test actually exercises something real, not a false-positive pass from a typo or
+   a vacuous assertion.
+2. **Implementation step** — write the minimal code to satisfy those tests. Its acceptance check is
+   that the same test(s) now **pass** (green), *and* that the project's full existing test suite
+   still passes (no regression) — not just the new tests in isolation.
+
+A step that's genuinely non-behavioral (pure config, docs, a rename with no logic change) may skip
+this pairing — but say so explicitly in the plan ("no test needed — config only"), the same way
+`## Boundaries` requires "none — full repo in scope" to be stated outright rather than the section
+being thin or silently absent. Never omit test steps because "the change is simple" — simple changes
+regress silently too.
+
+Add a short `## Testing strategy` section naming: which test command(s) this project actually uses
+(from `.ai/intake-mcp.md`/`make test` — same convention `docs://implementation-procedure` already
+relies on), and, for each Implementation order group, a one-line note on what's being tested and how
+(pass path + fail/error path). This is required on every plan, same standing as `## Boundaries` — not
+optional, not something to add only when asked.
 
 ### `## Open Questions` format — required, checked by `approve_plan`
 

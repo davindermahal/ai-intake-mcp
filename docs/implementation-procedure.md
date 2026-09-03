@@ -79,6 +79,16 @@ you go.
 - **Run each step's acceptance check before starting the next step.** If a check fails, re-read the
   step and fix your change; don't continue past a failing check. A check that still fails after one
   fix attempt is a stop condition, not something to retry indefinitely or route around.
+- **Test-first steps mean what they say — run them in the order written, don't collapse them.**
+  `docs://planning-procedure`'s `## Testing strategy` pairs a *test step* with an *implementation
+  step* for each unit of behavior. On a test step: write the test(s) exactly as the plan describes,
+  then run them — the acceptance check is that they **fail, for the reason the plan expects** (red).
+  If a "new" test actually passes immediately, stop — it isn't testing the behavior you're about to
+  add, and needs fixing before you write any implementation code against it. On the following
+  implementation step: write the minimal code to satisfy those specific tests, then run them again —
+  the acceptance check is that they now **pass** (green) *and* the project's full existing test
+  suite still passes. Never write the implementation before its paired test step, even if the code
+  seems obvious — the point is the test existing and failing first, not just existing.
 - **Treat the plan's `Scope` → "Out" and `Boundaries` sections as hard fences, not suggestions.**
   Never touch a file/directory they name, never add a dependency, abstraction, refactor, test, or
   config/build/CI change they don't call for — even when it looks like the easier or more "correct"
