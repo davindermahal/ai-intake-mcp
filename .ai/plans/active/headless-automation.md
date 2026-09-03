@@ -1,6 +1,11 @@
 # Plan: headless automation mode for `ai-intake-mcp`
 
-**Status**: active — implementation underway, phased (see "Implementation Order" below)
+**Status**: active — Phases 1-7 implemented on branch `headless-automation` (all `npm test`/lint/
+typecheck green throughout, TDD per decision #22). Remaining before this can run unattended: a
+human review of the diff/design, then decision #21's last verification layer — a `--dry-run` run
+against the real, live Jira board (`scripts/automation-poll.sh --dry-run` / `npm run automation-poll
+-- --dry-run`), which needs real credentials and can't be exercised from an implementation session.
+See "Implementation Order" below for what each phase covers.
 
 **Created**: 2026-09-02
 **Updated**: 2026-09-02
