@@ -145,18 +145,18 @@ server.registerTool(
   "write_repo_config",
   {
     description:
-      "Creates or overwrites .ai/intake-mcp.json at the current repo's root, mapping it to a Jira " +
-      "project key and app tag. Called once, automatically, the first time a tracker tool is used " +
-      "in an unconfigured repo.",
+      "Creates or overwrites .ai/intake-mcp.json at the current repo's root, mapping it to one or " +
+      "more Jira project keys and an app tag. Called once, automatically, the first time a tracker " +
+      "tool is used in an unconfigured repo.",
     inputSchema: {
-      jira_project_key: z.string().describe('e.g. "DAV"'),
+      jira_project_keys: z.array(z.string()).min(1).describe('e.g. ["DAV"] or ["DAV", "OPS"]'),
       app_tag: z.string().describe('e.g. "app:my-repo"'),
     },
     annotations: { readOnlyHint: false, destructiveHint: false, title: "Write repo config" },
   },
-  ({ jira_project_key: jiraProjectKey, app_tag: appTag }) => {
+  ({ jira_project_keys: jiraProjectKeys, app_tag: appTag }) => {
     try {
-      return ok(writeRepoConfigTool(jiraProjectKey, appTag));
+      return ok(writeRepoConfigTool(jiraProjectKeys, appTag));
     } catch (err) {
       return fail(err);
     }

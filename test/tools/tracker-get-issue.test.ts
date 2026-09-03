@@ -70,8 +70,20 @@ describe("trackerGetIssue", () => {
     writeRepoConfigFile({ jiraProjectKey: "DAV", appTag: "app:my-repo" });
     const fetchImpl = vi.fn(async () => issueResponse("OTHER-1", ["state:plan", "app:my-repo"]));
     await expect(trackerGetIssue(makeClient(fetchImpl), "OTHER-1", repoRoot)).rejects.toThrow(
-      /belongs to Jira project "OTHER", not "DAV"/,
+      /belongs to Jira project "OTHER", not one of \[DAV\]/,
     );
+  });
+
+  it("accepts a ticket whose project key is any of several configured jiraProjectKeys", async () => {
+    writeRepoConfigFile({ jiraProjectKeys: ["DAV", "OPS"], appTag: "app:my-repo" });
+    const fetchImpl = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("/issue/OPS-9?")) return issueResponse("OPS-9", ["state:plan", "app:my-repo"]);
+      return jsonResponse(undefined, 204);
+    });
+
+    const result = await trackerGetIssue(makeClient(fetchImpl), "OPS-9", repoRoot);
+    expect(result.summary).toBe("Test ticket");
   });
 
   it("returns the issue summary/status/description/comments when configured and matching", async () => {

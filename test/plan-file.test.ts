@@ -5,6 +5,8 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   findPlanFile,
   planHasBoundariesSection,
+  planHasImplementationOrderSection,
+  planHasTestingStrategySection,
   planHasUnresolvedOpenQuestions,
   readPlanStatus,
   setPlanStatus,
@@ -81,6 +83,80 @@ describe("planHasBoundariesSection", () => {
       "utf8",
     );
     expect(planHasBoundariesSection(path)).toBe(false);
+  });
+});
+
+describe("planHasImplementationOrderSection", () => {
+  it("returns false when the plan has no Implementation order heading", () => {
+    const path = writePlan("ready");
+    expect(planHasImplementationOrderSection(path)).toBe(false);
+  });
+
+  it("returns true when the plan has a non-empty Implementation order section", () => {
+    const path = writePlan("ready");
+    writeFileSync(
+      path,
+      `${readFileSync(path, "utf8")}\n## Implementation order\n\n1. Do the thing.\n`,
+      "utf8",
+    );
+    expect(planHasImplementationOrderSection(path)).toBe(true);
+  });
+
+  it("matches case-insensitively (## Implementation Order)", () => {
+    const path = writePlan("ready");
+    writeFileSync(
+      path,
+      `${readFileSync(path, "utf8")}\n## Implementation Order\n\n1. Do the thing.\n`,
+      "utf8",
+    );
+    expect(planHasImplementationOrderSection(path)).toBe(true);
+  });
+
+  it("returns false when the heading is present but the section is empty", () => {
+    const path = writePlan("ready");
+    writeFileSync(
+      path,
+      `${readFileSync(path, "utf8")}\n## Implementation order\n\n## Testing strategy\n\nSomething.\n`,
+      "utf8",
+    );
+    expect(planHasImplementationOrderSection(path)).toBe(false);
+  });
+
+  it("does not match a mid-sentence mention", () => {
+    const path = writePlan("ready");
+    writeFileSync(
+      path,
+      `${readFileSync(path, "utf8")}\nFollow the Implementation order described above.\n`,
+      "utf8",
+    );
+    expect(planHasImplementationOrderSection(path)).toBe(false);
+  });
+});
+
+describe("planHasTestingStrategySection", () => {
+  it("returns false when the plan has no Testing strategy heading", () => {
+    const path = writePlan("ready");
+    expect(planHasTestingStrategySection(path)).toBe(false);
+  });
+
+  it("returns true when the plan has a non-empty Testing strategy section", () => {
+    const path = writePlan("ready");
+    writeFileSync(
+      path,
+      `${readFileSync(path, "utf8")}\n## Testing strategy\n\nRun \`npm test\`.\n`,
+      "utf8",
+    );
+    expect(planHasTestingStrategySection(path)).toBe(true);
+  });
+
+  it("returns false when the heading is present but the section is empty", () => {
+    const path = writePlan("ready");
+    writeFileSync(
+      path,
+      `${readFileSync(path, "utf8")}\n## Testing strategy\n\n## Boundaries\n\nNone.\n`,
+      "utf8",
+    );
+    expect(planHasTestingStrategySection(path)).toBe(false);
   });
 });
 
