@@ -50,6 +50,17 @@ export function progressLogPath(projectName: string, ticketKey: string, stateRoo
   return join(stateRoot, projectName, "progress", `${ticketKey}.log`);
 }
 
+/** Where a provider adapter (`src/ai/launch.ts`) redirects a launched worker's stdout/stderr. */
+export function logDirPath(projectName: string, stateRoot: string = DEFAULT_STATE_ROOT): string {
+  return join(stateRoot, projectName, "logs");
+}
+
+/** Where the orchestrator writes a launch's fully-rendered prompt text (decision #15's templates,
+ * after `renderPrompt` substitution) before handing the path to a provider adapter. */
+export function promptFilePath(projectName: string, ticketKey: string, stateRoot: string = DEFAULT_STATE_ROOT): string {
+  return join(stateRoot, projectName, "prompts", `${ticketKey}.md`);
+}
+
 function writeJson(path: string, data: unknown): void {
   mkdirSync(dirname(path), { recursive: true });
   writeFileSync(path, JSON.stringify(data, null, 2), "utf8");
