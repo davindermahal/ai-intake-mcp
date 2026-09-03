@@ -66,7 +66,7 @@ class FakeBoard {
         headers: { "content-type": "application/json" },
       });
 
-    if (method === "POST" && url.endsWith("/rest/api/3/search")) {
+    if (method === "POST" && url.endsWith("/rest/api/3/search/jql")) {
       const body = JSON.parse((init?.body as string) ?? "{}") as { jql: string };
       const wantedLabels = [...body.jql.matchAll(/labels = "([^"]+)"/g)].map((m) => m[1] as string);
       const matches = [...this.issues.entries()].filter(([, issue]) =>

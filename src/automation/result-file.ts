@@ -13,7 +13,12 @@ import { dirname, join } from "node:path";
  * target repo.
  */
 
-const DEFAULT_STATE_ROOT = join(homedir(), ".config", "ai-intake-mcp", "state");
+/** Exported so `src/ai/claude.ts`/`src/ai/gemini.ts` can grant a launched worker access to this
+ * tree via `--add-dir`/`--include-directories` — both CLIs sandbox headless (`-p`) file access to
+ * the cwd (the worktree) by default, so without this a worker can't read its own context file or
+ * write its progress log/result file (confirmed live during headless-automation QA Phase E: every
+ * worker failed immediately, unable to reach any file under this path). */
+export const DEFAULT_STATE_ROOT = join(homedir(), ".config", "ai-intake-mcp", "state");
 
 export interface WorkerContext {
   ticketKey: string;

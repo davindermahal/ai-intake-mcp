@@ -220,8 +220,10 @@ describe("runWatchdogPass — dead planning worker, result present", () => {
     writeMarker("my-app", baseMarker({ pid: 99999 }), stateRoot);
     writeResult("my-app", "DAV-5", { outcome: "done" });
 
-    const fetchImpl = vi.fn(async (input: RequestInfo | URL) => {
+    const calls: { url: string; body?: string }[] = [];
+    const fetchImpl = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
+      calls.push({ url, body: init?.body as string | undefined });
       if (url.includes("/issue/DAV-5?")) return issueResponse("DAV-5", ["state:plan", "app:my-repo"]);
       if (url.endsWith("/myself")) return jsonResponse({ accountId: "me" });
       return jsonResponse(undefined, 204);
@@ -229,6 +231,40 @@ describe("runWatchdogPass — dead planning worker, result present", () => {
 
     const result = await runWatchdogPass(makeCtx(fetchImpl));
     expect(result.completed).toEqual(["DAV-5"]);
+    const labelsPut = calls.find((c) => c.body?.includes('"labels"'));
+    expect(JSON.parse(labelsPut?.body ?? "{}").fields.labels).toContain("state:needs-input");
+  });
+
+  // headless-automation-qa.md Phase E found this live: a plan whose only unresolved item is a
+  // non-blocking "## Confirm at Review" note (not "## Open Questions") must still land on
+  // state:review, never state:needs-input — that section is reviewed, not a pipeline blocker.
+  it("transitions to review (not needs-input) when only Confirm at Review has an unresolved item", async () => {
+    await seedPlan(
+      "DAV-5",
+      COMPLETE_SECTIONS,
+      "\n## Open Questions\n\n- [x] Resolved.\n\n## Confirm at Review\n\n- [ ] Recommend as-is.\n",
+    );
+    deadPids.add(99999);
+    writeMarker("my-app", baseMarker({ pid: 99999 }), stateRoot);
+    writeResult("my-app", "DAV-5", { outcome: "done" });
+
+    const calls: { url: string; method: string; body?: string }[] = [];
+    const fetchImpl = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      calls.push({ url, method: init?.method ?? "GET", body: init?.body as string | undefined });
+      if (url.includes("/issue/DAV-5?")) return issueResponse("DAV-5", ["state:plan", "app:my-repo"]);
+      if (url.endsWith("/myself")) return jsonResponse({ accountId: "me" });
+      return jsonResponse(undefined, 204);
+    });
+
+    const result = await runWatchdogPass(makeCtx(fetchImpl));
+
+    expect(result.completed).toEqual(["DAV-5"]);
+    const labelsPut = calls.find((c) => c.body?.includes('"labels"'));
+    expect(JSON.parse(labelsPut?.body ?? "{}").fields.labels).toContain("state:review");
+    const commentCall = calls.find((c) => c.method === "POST" && c.url.includes("/comment"));
+    expect(commentCall?.body).toContain("Plan ready for review");
+    expect(commentCall?.body).not.toContain("I need answers before finalizing");
   });
 
   it("retries with a correction note instead of posting/transitioning when a required section is missing", async () => {

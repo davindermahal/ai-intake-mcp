@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   findPlanFile,
   getQAPlanSectionText,
+  planHasBlockingOpenQuestions,
   planHasBoundariesSection,
   planHasImplementationOrderSection,
   planHasQAPlanSection,
@@ -266,6 +267,69 @@ describe("planHasUnresolvedOpenQuestions", () => {
       "utf8",
     );
     expect(planHasUnresolvedOpenQuestions(path)).toBe(false);
+  });
+
+  // headless-automation-qa.md Phase E found this live: a plan with only a non-blocking
+  // "confirm at review" note left unchecked still bounced the ticket to state:needs-input with a
+  // misleading "I need answers" comment. planHasUnresolvedOpenQuestions (this function — used by
+  // approve_plan's refusal gate, which must NOT weaken) now also scans "## Confirm at Review", so
+  // a human still can't slip a plan past approve_plan with one of these left unresolved.
+  it("returns true when only Confirm at Review has an unresolved item (approve_plan's gate must still catch it)", () => {
+    const path = writePlan("ready");
+    writeFileSync(
+      path,
+      `${readFileSync(path, "utf8")}\n## Open Questions\n\n- [x] Resolved.\n\n` +
+        `## Confirm at Review\n\n- [ ] Recommend defaulting to 3 retries — confirm at review.\n`,
+      "utf8",
+    );
+    expect(planHasUnresolvedOpenQuestions(path)).toBe(true);
+  });
+
+  it("returns false when Confirm at Review is fully resolved too", () => {
+    const path = writePlan("ready");
+    writeFileSync(
+      path,
+      `${readFileSync(path, "utf8")}\n## Open Questions\n\n- [x] Resolved.\n\n` +
+        `## Confirm at Review\n\n- [x] Confirmed.\n`,
+      "utf8",
+    );
+    expect(planHasUnresolvedOpenQuestions(path)).toBe(false);
+  });
+});
+
+describe("planHasBlockingOpenQuestions", () => {
+  // The routing fix itself (src/automation/watchdog-pass.ts): unlike
+  // planHasUnresolvedOpenQuestions, this only ever looks at "## Open Questions" — a non-blocking
+  // "confirm at review" note living in its own section must never make a plan look blocked.
+  it("returns false when there is no Open Questions heading", () => {
+    const path = writePlan("ready");
+    expect(planHasBlockingOpenQuestions(path)).toBe(false);
+  });
+
+  it("returns true when Open Questions has an unchecked item", () => {
+    const path = writePlan("ready");
+    writeFileSync(
+      path,
+      `${readFileSync(path, "utf8")}\n## Open Questions\n\n- [ ] Still genuinely blocking.\n`,
+      "utf8",
+    );
+    expect(planHasBlockingOpenQuestions(path)).toBe(true);
+  });
+
+  it("returns false when Open Questions is fully resolved, even with an unresolved Confirm at Review item", () => {
+    const path = writePlan("ready");
+    writeFileSync(
+      path,
+      `${readFileSync(path, "utf8")}\n## Open Questions\n\n- [x] Resolved.\n\n` +
+        `## Confirm at Review\n\n- [ ] Recommend as-is — confirm at review.\n`,
+      "utf8",
+    );
+    expect(planHasBlockingOpenQuestions(path)).toBe(false);
+  });
+
+  it("returns false when both sections are absent", () => {
+    const path = writePlan("ready");
+    expect(planHasBlockingOpenQuestions(path)).toBe(false);
   });
 });
 

@@ -5,10 +5,10 @@ import { fetchIssue } from "../jira/tags.js";
 import {
   findPlanFile,
   getQAPlanSectionText,
+  planHasBlockingOpenQuestions,
   planHasImplementationOrderSection,
   planHasQAPlanSection,
   planHasTestingStrategySection,
-  planHasUnresolvedOpenQuestions,
 } from "../plan-file.js";
 import { findWorktreeForTicket } from "../worktree.js";
 import { type DispatchContext, dispatchWorker } from "./dispatch.js";
@@ -159,7 +159,7 @@ async function finishPlanningWorker(
   }
 
   const planText = readFileSync(planPath, "utf8");
-  const hasOpenQuestions = planHasUnresolvedOpenQuestions(planPath);
+  const hasOpenQuestions = planHasBlockingOpenQuestions(planPath);
   const target = hasOpenQuestions ? "needs-input" : "review";
   const heading = hasOpenQuestions
     ? `Drafted/refined the plan at \`${planPath}\`. I need answers before finalizing — see the ` +

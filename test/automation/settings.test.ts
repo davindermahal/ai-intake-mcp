@@ -1,3 +1,5 @@
+import { homedir } from "node:os";
+import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ProjectOverrides } from "../../src/automation/registry.js";
 import type { AutomationSettings } from "../../src/automation/settings.js";
@@ -142,9 +144,13 @@ describe("resolvePlanningConcurrencyCap", () => {
 describe("resolvePermissionProfilePath", () => {
   const settings = DEFAULTS;
 
-  it("returns the global Claude default when no override is given", () => {
+  // launch.ts passes this straight into spawn() with no shell (decision #9's chokepoint) — a
+  // literal, unexpanded "~" would make every real `claude --settings ~/...` invocation fail with
+  // "Settings file not found" (confirmed against the real CLI during headless-automation QA
+  // Phase B). Every case below asserts a real, homedir()-expanded absolute path, never a raw "~".
+  it("returns the global Claude default, tilde-expanded, when no override is given", () => {
     expect(resolvePermissionProfilePath(settings, undefined, "claude")).toBe(
-      "~/.config/ai-intake-mcp/permissions/claude.json",
+      join(homedir(), ".config", "ai-intake-mcp", "permissions", "claude.json"),
     );
   });
 
@@ -153,10 +159,17 @@ describe("resolvePermissionProfilePath", () => {
     expect(resolvePermissionProfilePath(settings, overrides, "claude")).toBe("/custom/claude.json");
   });
 
+  it("tilde-expands a per-project Claude override too", () => {
+    const overrides: ProjectOverrides = { permissionProfile: "~/custom/claude.json" };
+    expect(resolvePermissionProfilePath(settings, overrides, "claude")).toBe(
+      join(homedir(), "custom", "claude.json"),
+    );
+  });
+
   it("ignores permissionProfile for Gemini — machine-global by tier, decision #9", () => {
     const overrides: ProjectOverrides = { permissionProfile: "/custom/gemini.toml" };
     expect(resolvePermissionProfilePath(settings, overrides, "gemini")).toBe(
-      "~/.gemini/policies/ai-intake-mcp-headless.toml",
+      join(homedir(), ".gemini", "policies", "ai-intake-mcp-headless.toml"),
     );
   });
 });

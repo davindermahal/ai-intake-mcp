@@ -176,6 +176,20 @@ export function resolvePlanningConcurrencyCap(
   return overrides?.concurrency?.planning ?? settings.concurrency.planning;
 }
 
+/**
+ * Expands a leading `~` to the real home directory. Every path this module hands to `spawn()`
+ * (`src/ai/launch.ts`) goes through no shell, so nothing else would ever expand it — confirmed live
+ * against the `claude` CLI during headless-automation QA (Phase B): `--settings
+ * ~/.config/ai-intake-mcp/permissions/claude.json` with the tilde literally unexpanded fails with
+ * `Error: Settings file not found`, which is exactly what `DEFAULT_SETTINGS.permissions.claude`
+ * would have produced on every fresh install (no `~/.config/ai-intake-mcp/settings.json` yet).
+ */
+function expandHome(path: string): string {
+  if (path === "~") return homedir();
+  if (path.startsWith("~/")) return join(homedir(), path.slice(2));
+  return path;
+}
+
 /** Resolved permission-profile path for a provider (decision #9). Claude honors a per-project
  * `overrides.permissionProfile`; Gemini never does — its policy engine is machine-global by tier
  * (gemini-cli issue #18186), so a per-project override would silently be a no-op and is ignored
@@ -186,7 +200,7 @@ export function resolvePermissionProfilePath(
   provider: "claude" | "gemini",
 ): string {
   if (provider === "claude" && overrides?.permissionProfile) {
-    return overrides.permissionProfile;
+    return expandHome(overrides.permissionProfile);
   }
-  return settings.permissions[provider];
+  return expandHome(settings.permissions[provider]);
 }

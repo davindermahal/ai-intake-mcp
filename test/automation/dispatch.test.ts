@@ -1,6 +1,6 @@
 import { execFileSync } from "node:child_process";
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { type DispatchContext, dispatchWorker } from "../../src/automation/dispatch.js";
@@ -85,7 +85,12 @@ describe("dispatchWorker", () => {
     expect(options.phase).toBe("planning");
     expect(options.attempts).toBe(1);
     expect(options.worktreePath).toBe(result.worktree.worktreePath);
-    expect(options.permissionProfilePath).toBe("~/.config/ai-intake-mcp/permissions/claude.json");
+    // Tilde-expanded (resolvePermissionProfilePath, settings.ts) — spawn() takes no shell, so a
+    // literal "~" would break the real `claude --settings` invocation (headless-automation QA
+    // Phase B).
+    expect(options.permissionProfilePath).toBe(
+      join(homedir(), ".config", "ai-intake-mcp", "permissions", "claude.json"),
+    );
 
     const promptContent = readFileSync(options.promptPath as string, "utf8");
     expect(promptContent).toContain("DAV-5");
@@ -113,7 +118,9 @@ describe("dispatchWorker", () => {
     const [providerArg, options] = launch.mock.calls[0] as [string, Record<string, unknown>];
     expect(providerArg).toBe("gemini");
     expect(options.model).toBe("gemini-2.5-pro");
-    expect(options.permissionProfilePath).toBe("~/.gemini/policies/ai-intake-mcp-headless.toml");
+    expect(options.permissionProfilePath).toBe(
+      join(homedir(), ".gemini", "policies", "ai-intake-mcp-headless.toml"),
+    );
   });
 
   it("passes the given attempts count through to the launcher", async () => {

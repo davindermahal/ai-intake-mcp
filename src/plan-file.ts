@@ -8,6 +8,7 @@ const STATUS_LINE = /^(\*\*Status\*\*:)\s*.*$/m;
 const UPDATED_LINE = /^(\*\*Updated\*\*:)\s*.*$/m;
 const BOUNDARIES_HEADING = /^##\s+Boundaries\s*$/m;
 const OPEN_QUESTIONS_HEADING = /^##\s+Open Questions\s*$/m;
+const CONFIRM_AT_REVIEW_HEADING = /^##\s+Confirm at Review\s*$/im;
 const IMPLEMENTATION_ORDER_HEADING = /^##\s+Implementation order\s*$/im;
 const TESTING_STRATEGY_HEADING = /^##\s+Testing strategy\s*$/im;
 const QA_PLAN_HEADING = /^##\s+QA Plan\s*$/im;
@@ -96,14 +97,42 @@ export function getQAPlanSectionText(planPath: string): string | undefined {
   return trimmed.length > 0 ? trimmed : undefined;
 }
 
-/** True if the plan file's `## Open Questions` section has any unresolved `- [ ]` item.
- * `docs/planning-procedure.md` requires every Open Questions item — blocking or a non-blocking
- * "confirm at review" note alike — to be written as a `- [ ]`/`- [x]` task-list line;
- * `approve_plan` refuses to approve while any `- [ ]` remains, closing the gap where a plan reached
- * `state:review` with something still unaddressed and the human approving it never noticed. No
- * `## Open Questions` heading at all means nothing to resolve — not itself an approval blocker (that
- * would duplicate the `## Boundaries` check's job for an unrelated section). */
+/**
+ * True if `## Open Questions` OR `## Confirm at Review` has any unresolved `- [ ]` item.
+ * `docs/planning-procedure.md` requires every item in either section to be written as a `- [ ]`/
+ * `- [x]` task-list line; `approve_plan` refuses to approve while any `- [ ]` remains anywhere in
+ * either section, closing the gap where a plan reached `state:review` with something still
+ * unaddressed — including a non-blocking "confirm at review" note — and the human approving it
+ * never noticed. Neither heading present at all means nothing to resolve — not itself an approval
+ * blocker (that would duplicate the `## Boundaries` check's job for an unrelated section).
+ *
+ * Distinct from `planHasBlockingOpenQuestions` below, which only ever looks at `## Open Questions`
+ * — that narrower check is what decides the headless `needs-input`/`review` routing (a "confirm at
+ * review" note must never make a plan look blocked there), while this broader one is what
+ * `approve_plan`'s final human-approval gate uses, and must never get narrower than it is today.
+ */
 export function planHasUnresolvedOpenQuestions(planPath: string): boolean {
+  const content = readFileSync(planPath, "utf8");
+  const openQuestions = sectionBody(content, OPEN_QUESTIONS_HEADING);
+  const confirmAtReview = sectionBody(content, CONFIRM_AT_REVIEW_HEADING);
+  return (
+    (openQuestions !== undefined && UNCHECKED_TASK_ITEM.test(openQuestions)) ||
+    (confirmAtReview !== undefined && UNCHECKED_TASK_ITEM.test(confirmAtReview))
+  );
+}
+
+/**
+ * True if `## Open Questions` specifically (never `## Confirm at Review`) has any unresolved
+ * `- [ ]` item — the headless watchdog's `needs-input`-vs-`review` routing decision
+ * (`src/automation/watchdog-pass.ts`), found live during `headless-automation-qa.md` Phase E: a
+ * genuinely clean plan whose only unchecked item was a non-blocking "confirm at review" note still
+ * bounced to `state:needs-input` with a misleading "I need answers before finalizing" comment,
+ * because the routing decision used to share `planHasUnresolvedOpenQuestions` above — which
+ * (correctly, for `approve_plan`'s purposes) treats a "confirm at review" item as still needing
+ * human acknowledgement, but that's a "look at this during review" signal, not a "the pipeline
+ * cannot proceed without your answer" one.
+ */
+export function planHasBlockingOpenQuestions(planPath: string): boolean {
   const content = readFileSync(planPath, "utf8");
   const section = sectionBody(content, OPEN_QUESTIONS_HEADING);
   if (section === undefined) return false;

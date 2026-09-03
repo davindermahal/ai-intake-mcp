@@ -55,9 +55,9 @@ ls .ai/plans/active/{{TICKET_KEY}}-*.md
 ```
 
 Then: **Goal**, **Scope** (in/out), **Files to change** (one-line reason each), **Key decisions**,
-**Implementation order**, **Testing strategy**, **QA Plan**, **Boundaries**, **Open Questions**.
-Leave `**Status**: draft` — nothing in this session ever flips it to `ready`; that's a separate human
-approval step.
+**Implementation order**, **Testing strategy**, **QA Plan**, **Boundaries**, **Open Questions**,
+**Confirm at Review**. Leave `**Status**: draft` — nothing in this session ever flips it to `ready`;
+that's a separate human approval step.
 
 ### Write for a weaker executor
 
@@ -138,22 +138,36 @@ above is sufficient, no real external system is touched by this change"` — rat
 section thin or absent. Same standard as `## Boundaries`'s "none — full repo in scope": an explicit
 "none" is fine; a thin or missing section is a planning defect.
 
-### `## Open Questions` format — required
+### `## Open Questions` and `## Confirm at Review` format — required
 
-Every item, blocking or not, is a GitHub-style task-list line: `- [ ]` while unresolved, `- [x]` once
-resolved. A human reviewer refuses to approve while any `- [ ]` item remains — that's the point: it
-forces whoever reviews the plan to actually engage with each open item (edit the plan to check it
-off, accepting the noted default, rather than approving with something silently unaddressed).
-Resolving an item means flipping `[ ]` → `[x]` in place — never delete the line; it's the plan's own
-record of what was raised and how it was settled.
+Two separate sections, both GitHub-style task-list lines (`- [ ]` while unresolved, `- [x]` once
+resolved), split by whether the pipeline can proceed without a human answer:
+
+- **`## Open Questions`** — genuinely blocking: an ambiguity only the ticket's author can resolve,
+  not something you can settle from the codebase or a sensible default. The orchestrator routes the
+  ticket to `state:needs-input` whenever this section has any unresolved `- [ ]` item — it cannot
+  proceed without a real answer.
+- **`## Confirm at Review`** — non-blocking: you've already settled it (from the codebase or a safe
+  default) and just want a reviewer's nod, not new information. The orchestrator never routes to
+  `state:needs-input` because of this section — it goes straight to `state:review`, same as a plan
+  with no open items at all. State your recommended choice in the item itself.
+
+Both sections are still checked by `approve_plan` before implementation can start: a human refuses to
+approve while *any* `- [ ]` item remains in either one — that's the point of keeping both as
+checkboxes rather than plain prose: it forces whoever reviews the plan to actually engage with every
+item (edit the plan to check it off, accepting the noted default, rather than approving with
+something silently unaddressed). Resolving an item means flipping `[ ]` → `[x]` in place — never
+delete the line; it's the plan's own record of what was raised and how it was settled. If a plan
+truly has nothing for one of the sections, write `None` under its heading rather than omitting the
+heading.
 
 ## 2. Decide: blocking questions vs. clean
 
-Judge whether **Open Questions** contains anything that genuinely blocks a confident plan — an
-ambiguity only the ticket's author can resolve, not something you can settle from the codebase or a
-sensible default.
+Judge whether anything genuinely blocks a confident plan — an ambiguity only the ticket's author can
+resolve, not something you can settle from the codebase or a sensible default.
 
-**Structural decisions always block, even when a sensible default exists:**
+**Structural decisions always block, even when a sensible default exists — these go under
+`## Open Questions`, never `## Confirm at Review`:**
 
 - **Schema/data-model changes** to existing tables — adding/removing/renaming a column, changing a
   primary key, altering types/constraints, any migration that rewrites or backfills existing rows.
@@ -163,8 +177,9 @@ sensible default.
   API/response shape.
 
 State your recommended option in the question so a human can confirm with a one-word reply, written
-as `- [ ]`. Non-structural ambiguities you can settle from the codebase or a safe default stay
-"clean" (note them under Open Questions as `- [ ]` "confirm at review" instead of blocking on them).
+as `- [ ]` under `## Open Questions`. Non-structural ambiguities you can settle from the codebase or
+a safe default go under `## Confirm at Review` instead, written the same way (`- [ ]`, with your
+recommendation stated) — never mix the two under one heading.
 
 ## 3. Commit the plan file
 
@@ -182,8 +197,8 @@ Never `git push`.
 
 You have no `tracker_add_comment`/`tracker_transition` tools. The orchestrator reads the committed
 plan file itself (to decide `state:needs-input` vs. `state:review`, from whether `## Open Questions`
-has any unresolved `- [ ]` item) and handles every Jira comment/transition after you exit. Your only
-job is to write `{{RESULT_FILE_PATH}}`:
+— not `## Confirm at Review` — has any unresolved `- [ ]` item) and handles every Jira
+comment/transition after you exit. Your only job is to write `{{RESULT_FILE_PATH}}`:
 
 ```json
 { "outcome": "done" }

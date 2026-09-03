@@ -146,6 +146,25 @@ describe("approvePlanTool", () => {
     expect(fetchImpl).not.toHaveBeenCalled();
   });
 
+  // Regression guard (headless-automation-qa.md's open-questions-blocking-vs-confirm-split plan):
+  // watchdog-pass.ts now routes on "## Open Questions" alone (a "## Confirm at Review" note must
+  // never look blocking there), but approve_plan's own gate must NOT weaken to match — a human
+  // still can't approve past an unresolved "## Confirm at Review" item any more than an Open
+  // Questions one.
+  it("refuses when only Confirm at Review has an unresolved item, even with Open Questions fully resolved", async () => {
+    writeFileSync(
+      planPath,
+      `${PLAN_HEADER}\n## Open Questions\n\n- [x] Resolved.\n\n## Confirm at Review\n\n` +
+        `- [ ] Recommend as-is.\n${COMPLETE_SECTIONS}`,
+      "utf8",
+    );
+    const fetchImpl = vi.fn();
+    await expect(approvePlanTool(makeClient(fetchImpl), config, "DAV-5", repoRoot)).rejects.toThrow(
+      /unresolved "- \[ \]" items/,
+    );
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
   it("refuses when the plan has no Implementation order section", async () => {
     writeFileSync(planPath, `${PLAN_HEADER}\n## Testing strategy\n\nRun \`npm test\`.\n`, "utf8");
     const fetchImpl = vi.fn();

@@ -43,7 +43,7 @@ export function buildDiscoveryJql(query: DiscoveryQuery): string {
 /** `tracker_search` equivalent (decision #6's "new work" item) — runs a JQL query and maps every
  * result the same way `fetchIssue` maps a single ticket. */
 export async function searchIssues(client: JiraClient, jql: string): Promise<JiraIssue[]> {
-  const result = await client.post<{ issues: RawJiraIssue[] }>("/rest/api/3/search", {
+  const result = await client.post<{ issues: RawJiraIssue[] }>("/rest/api/3/search/jql", {
     jql,
     fields: ["summary", "status", "description", "comment", "labels", "assignee"],
   });

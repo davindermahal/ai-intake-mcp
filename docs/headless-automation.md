@@ -45,6 +45,51 @@ display name and whether to enable it immediately. Writes an entry to
 `~/.config/ai-intake-mcp/projects.json`. Safe to re-run — it updates the existing entry for the same
 repo path rather than duplicating it.
 
+### Scripting the registration wizard
+
+The wizard also accepts flags, skipping every `readline` prompt entirely:
+
+```bash
+node --import tsx scripts/register-project.ts --path <repo> [--name <name>] \
+  [--enable|--no-enable] [--jira-keys DAV,OPS] [--app-tag app:my-repo]
+```
+
+`--jira-keys`/`--app-tag` are only consulted when the repo has no `.ai/intake-mcp.json` yet — same as
+the interactive prompts, an existing file always wins. This is the mode
+`test/e2e/register-project.e2e.test.ts` drives, and it's the mode to reach for any time you want to
+register a repo from a script or CI rather than a terminal.
+
+**Do not try to drive the interactive prompts by piping multiple answers into a plain pipe**
+(`printf 'a\nb\nc\n' | npm run register-project`) — it looks like it should work and usually doesn't.
+Node's `readline/promises` only resolves a pending `question()` with the *next* line that arrives
+while that question is actually being awaited; the wizard does real async work (a live Jira query)
+between prompts, and by the time it asks the next question, a plain pipe has often already flushed
+every line straight through — as far as the input stream is concerned, its writer already closed —
+so lines arriving before anyone is listening are silently dropped, and the interface then closes on
+EOF. The next `question()` call throws `readline was closed`. (This is exactly what happened testing
+this wizard manually during the headless-automation QA pass — see
+`.ai/plans/active/headless-automation-qa.md`, Phase C.) A FIFO held open with `sleep`s timed to
+outlast each async gap works around it, but it's fragile and slow; prefer the `--path` flags above
+for anything scripted.
+
+### Automated end-to-end coverage of the wizard
+
+`test/e2e/register-project.e2e.test.ts` exercises the real wizard against a real Jira board — fresh
+registration, re-registration/upsert, and the collision refusal — using the `--path` flags above, a
+throwaway repo under the OS tmpdir, and a random `app:e2e-register-<id>` tag per run so it never
+collides with anything real. It's part of `test/**/*.test.ts` but skipped by default; `npm test`
+never touches your Jira board. Run it deliberately with real credentials configured
+(`~/.config/ai-intake-mcp/.env`):
+
+```bash
+AI_INTAKE_RUN_JIRA_E2E=1 npx vitest run test/e2e/register-project.e2e.test.ts
+```
+
+It cleans up everything it creates (the registry entries it added, the one Jira ticket the collision
+test creates) in `afterAll`, even on failure. Override `AI_INTAKE_E2E_PROJECT_KEY`/
+`AI_INTAKE_E2E_ISSUE_TYPE` (default `DAV`/`Task`) if your Jira project doesn't have a `Task` issue
+type.
+
 ## 2. Dry-run — read this output carefully before doing anything else
 
 ```bash
