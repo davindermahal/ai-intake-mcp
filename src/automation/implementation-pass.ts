@@ -5,6 +5,7 @@ import { STATE_LABEL, currentStateLabel, fetchIssue } from "../jira/tags.js";
 import {
   findPlanFile,
   planHasImplementationOrderSection,
+  planHasQAPlanSection,
   planHasTestingStrategySection,
   planHasUnresolvedOpenQuestions,
   readPlanStatus,
@@ -77,6 +78,7 @@ export async function runImplementationPass(ctx: ImplementationPassContext): Pro
       if (planHasUnresolvedOpenQuestions(planPath)) missing.push('unresolved "## Open Questions" items');
       if (!planHasImplementationOrderSection(planPath)) missing.push('no "## Implementation order" section');
       if (!planHasTestingStrategySection(planPath)) missing.push('no "## Testing strategy" section');
+      if (!planHasQAPlanSection(planPath)) missing.push('no "## QA Plan" section');
 
       if (missing.length > 0) {
         const freshIssue = await fetchIssue(ctx.client, candidate.key);

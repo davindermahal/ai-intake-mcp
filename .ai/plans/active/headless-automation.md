@@ -689,6 +689,50 @@ to the planning phase.
       Jira) — a plan missing `## Testing strategy` is treated exactly like one missing
       `## Boundaries` or `## Implementation Order`: never silently allowed through.
 
+23. **A required `## QA Plan` section, same standing and same structural enforcement as decision
+    #22's `## Testing strategy` — added 2026-09-03, after this plan's own implementation was done and
+    a separate QA plan (`.ai/plans/active/headless-automation-qa.md`) had to be written by hand for
+    it.** Per your directive: "we must always create a QA plan... what can we automate, but
+    importantly, what does a developer or QA have to do to fully QA the implementation." Decision
+    #22 already established that `## Testing strategy` is required and TDD-structured — but that
+    section only proves the automated suite's *logic* is correct; it says nothing about what the
+    automated suite structurally *can't* observe (a real external API/service, real timing, a real
+    UI a human has to look at, a new unattended/scheduled process). Writing the headless-automation
+    QA plan by hand, after the fact, made the gap concrete: nothing in the plan-file format or its
+    structural gates ever asked "what does a human still have to check," so it never got asked until
+    the very end, by a human, not the planning process itself.
+    - **`docs/planning-procedure.md`** now requires a `## QA Plan` section on every plan (inserted
+      into the "Then:" list right after `## Testing strategy`, before `## Boundaries`) — same
+      standing, same "state explicitly or say 'None'" rule as `## Boundaries`/`## Testing strategy`.
+      Its content: what `## Testing strategy` already covers (a pointer, not a re-explanation) and,
+      separately, exactly what a human must still manually verify, written as literal, checkable
+      steps — same "write for a weaker executor" bar as `## Implementation order`. A plan whose
+      manual-QA surface is large enough to warrant its own document names a companion
+      `.ai/plans/active/<slug>-qa.md` instead of inlining it all — `headless-automation-qa.md` is the
+      reference example cited directly in the procedure doc.
+    - **`prompts/headless-planning.md`** updated to match — quoted, not paraphrased (decision #15's
+      standing rule), so headless and interactive planning can never drift onto different QA-Plan
+      standards the way decision #22 already prevented for Testing strategy.
+    - **`docs/implementation-procedure.md`**'s success report template now names the plan's `## QA
+      Plan` content ("Manual QA still needed: ...", or "None") in the completion comment — passing
+      `make test` proves the code, not the plan's own manual-QA requirement; naming it in the comment
+      is what stops it being silently forgotten once a ticket reaches `state:verify`.
+    - **Structural enforcement, extending decision #17's/#22's pattern**: `planHasQAPlanSection`
+      (`src/plan-file.ts`), checked at the same two gates as `planHasTestingStrategySection`
+      (`approve_plan`, and the headless watchdog's `finishPlanningWorker` before ever posting a plan
+      to Jira — retried with a correction note on failure, same retry budget, never a silent pass).
+      `getQAPlanSectionText` extracts the section's actual text (not just presence) so the headless
+      orchestrator's implementation-completion comment can include it too
+      (`watchdog-pass.ts`'s `finishImplementationWorker`) — parity with the interactive report
+      template above, since decision #1 already established the orchestrator composes every comment,
+      never the worker.
+    - **Not retroactively applied to this repo's own design-record plans** (this file,
+      `headless-automation-qa.md`, the on-demand-planning/implementation-phase/hardening-phase
+      plans) — the structural gate only fires on ticket plan files
+      (`.ai/plans/active/<KEY>-<slug>.md`, gated by `approve_plan`), not this project's own
+      `draft/active/completed` design documents, which have no `**Status**: draft/ready` field and
+      are never run through that tool.
+
 ## Reused unchanged
 
 `worktreeCreate` / `findWorktreeForTicket` / `worktreeRemove` (`src/worktree.ts`), plan-file helpers

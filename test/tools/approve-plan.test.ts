@@ -33,7 +33,8 @@ function git(args: string[], cwd: string): string {
 const PLAN_HEADER =
   "# Plan: DAV-5 Fix the thing\n\n**Status**: draft\n**Branch**: feature/DAV-5-fix-the-thing\n**Created**: 2026-01-01\n**Updated**: 2026-01-01\n";
 const COMPLETE_SECTIONS =
-  "\n## Implementation order\n\n1. Fix the thing.\n\n## Testing strategy\n\nRun `npm test`.\n";
+  "\n## Implementation order\n\n1. Fix the thing.\n\n## Testing strategy\n\nRun `npm test`.\n\n" +
+  "## QA Plan\n\nNone — automated coverage above is sufficient.\n";
 
 let parentDir: string;
 let repoRoot: string;
@@ -159,6 +160,19 @@ describe("approvePlanTool", () => {
     const fetchImpl = vi.fn();
     await expect(approvePlanTool(makeClient(fetchImpl), config, "DAV-5", repoRoot)).rejects.toThrow(
       /no "## Testing strategy" section/,
+    );
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it("refuses when the plan has no QA Plan section", async () => {
+    writeFileSync(
+      planPath,
+      `${PLAN_HEADER}\n## Implementation order\n\n1. Fix the thing.\n\n## Testing strategy\n\nRun \`npm test\`.\n`,
+      "utf8",
+    );
+    const fetchImpl = vi.fn();
+    await expect(approvePlanTool(makeClient(fetchImpl), config, "DAV-5", repoRoot)).rejects.toThrow(
+      /no "## QA Plan" section/,
     );
     expect(fetchImpl).not.toHaveBeenCalled();
   });

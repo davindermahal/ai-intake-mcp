@@ -4,6 +4,7 @@ import { STATE_LABEL, currentStateLabel, fetchIssue, transitionState } from "../
 import {
   findPlanFile,
   planHasImplementationOrderSection,
+  planHasQAPlanSection,
   planHasTestingStrategySection,
   planHasUnresolvedOpenQuestions,
   readPlanStatus,
@@ -58,6 +59,13 @@ export async function approvePlanTool(
     throw new Error(
       `Plan for ${ticketKey} (${planPath}) has no "## Testing strategy" section (or it's empty) — ` +
         `refusing to approve. Required on every plan, TDD-style (docs://planning-procedure).`,
+    );
+  }
+  if (!planHasQAPlanSection(planPath)) {
+    throw new Error(
+      `Plan for ${ticketKey} (${planPath}) has no "## QA Plan" section (or it's empty) — refusing ` +
+        `to approve. Required on every plan — state what's automated vs. what a human must manually ` +
+        `verify, or "None" if genuinely nothing needs manual QA (docs://planning-procedure).`,
     );
   }
 

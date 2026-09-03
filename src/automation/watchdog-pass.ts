@@ -4,7 +4,9 @@ import type { JiraClient } from "../jira/client.js";
 import { fetchIssue } from "../jira/tags.js";
 import {
   findPlanFile,
+  getQAPlanSectionText,
   planHasImplementationOrderSection,
+  planHasQAPlanSection,
   planHasTestingStrategySection,
   planHasUnresolvedOpenQuestions,
 } from "../plan-file.js";
@@ -141,13 +143,17 @@ async function finishPlanningWorker(
     return;
   }
 
-  if (!planHasImplementationOrderSection(planPath) || !planHasTestingStrategySection(planPath)) {
+  if (
+    !planHasImplementationOrderSection(planPath) ||
+    !planHasTestingStrategySection(planPath) ||
+    !planHasQAPlanSection(planPath)
+  ) {
     await retryOrEscalate(
       ctx,
       marker,
       result,
-      'Your previous plan was missing a required "## Implementation order" or "## Testing strategy" ' +
-        "section (or left one empty) — add both, fully populated, this time.",
+      'Your previous plan was missing a required "## Implementation order", "## Testing strategy", ' +
+        'or "## QA Plan" section (or left one empty) — add all three, fully populated, this time.',
     );
     return;
   }
@@ -180,11 +186,19 @@ async function finishImplementationWorker(
   const issue = await fetchIssue(ctx.client, marker.ticketKey);
 
   if (outcome === "success") {
+    // Passing tests proves the code's logic; it doesn't discharge the plan's own ## QA Plan — name
+    // it here (decision #1: the orchestrator composes every comment, never the worker) so it's not
+    // silently forgotten once the ticket moves to state:verify.
+    const worktree = findWorktreeForTicket(marker.ticketKey, ctx.project.path);
+    const planPath = worktree && findPlanFile(worktree.worktreePath, marker.ticketKey);
+    const qaPlanText = planPath ? getQAPlanSectionText(planPath) : undefined;
+
     const body =
       `Implementation complete (local — not pushed).\n\n` +
       (summary ? `What changed: ${summary}\n` : "") +
       (verify ? `Verify: ${verify}\n` : "") +
-      `\nReady for your review: check out the branch, review the diff, and merge when satisfied.`;
+      `\nReady for your review: check out the branch, review the diff, and merge when satisfied.` +
+      (qaPlanText ? `\n\nManual QA still needed:\n${qaPlanText}` : "");
     await maybeAddComment(ctx, ctx.client, marker.ticketKey, body, AUTOMATION_COMMENT_FOOTER);
     await maybeTransition(ctx, ctx.client, issue, "verify", ctx.config);
   } else {

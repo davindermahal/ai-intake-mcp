@@ -4,8 +4,10 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   findPlanFile,
+  getQAPlanSectionText,
   planHasBoundariesSection,
   planHasImplementationOrderSection,
+  planHasQAPlanSection,
   planHasTestingStrategySection,
   planHasUnresolvedOpenQuestions,
   readPlanStatus,
@@ -157,6 +159,70 @@ describe("planHasTestingStrategySection", () => {
       "utf8",
     );
     expect(planHasTestingStrategySection(path)).toBe(false);
+  });
+});
+
+describe("planHasQAPlanSection", () => {
+  it("returns false when the plan has no QA Plan heading", () => {
+    const path = writePlan("ready");
+    expect(planHasQAPlanSection(path)).toBe(false);
+  });
+
+  it("returns true when the plan has a non-empty QA Plan section", () => {
+    const path = writePlan("ready");
+    writeFileSync(
+      path,
+      `${readFileSync(path, "utf8")}\n## QA Plan\n\nNone — automated coverage above is sufficient.\n`,
+      "utf8",
+    );
+    expect(planHasQAPlanSection(path)).toBe(true);
+  });
+
+  it("matches case-insensitively (## QA plan)", () => {
+    const path = writePlan("ready");
+    writeFileSync(
+      path,
+      `${readFileSync(path, "utf8")}\n## QA plan\n\nManually verify X.\n`,
+      "utf8",
+    );
+    expect(planHasQAPlanSection(path)).toBe(true);
+  });
+
+  it("returns false when the heading is present but the section is empty", () => {
+    const path = writePlan("ready");
+    writeFileSync(
+      path,
+      `${readFileSync(path, "utf8")}\n## QA Plan\n\n## Boundaries\n\nNone.\n`,
+      "utf8",
+    );
+    expect(planHasQAPlanSection(path)).toBe(false);
+  });
+
+  it("does not match a mid-sentence mention", () => {
+    const path = writePlan("ready");
+    writeFileSync(
+      path,
+      `${readFileSync(path, "utf8")}\nFollow the QA Plan described above.\n`,
+      "utf8",
+    );
+    expect(planHasQAPlanSection(path)).toBe(false);
+  });
+});
+
+describe("getQAPlanSectionText", () => {
+  it("returns undefined when there is no QA Plan section", () => {
+    const path = writePlan("ready");
+    expect(getQAPlanSectionText(path)).toBeUndefined();
+  });
+
+  it("returns the trimmed section text", () => {
+    const path = writePlan("ready");
+    writeFileSync(
+      path,
+      `${readFileSync(path, "utf8")}\n## QA Plan\n\nManually verify X against the real API.\n\n## Boundaries\n\nNone.\n`,
+      "utf8",
+    );
+    expect(getQAPlanSectionText(path)).toBe("Manually verify X against the real API.");
   });
 });
 

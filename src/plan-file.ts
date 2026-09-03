@@ -10,6 +10,7 @@ const BOUNDARIES_HEADING = /^##\s+Boundaries\s*$/m;
 const OPEN_QUESTIONS_HEADING = /^##\s+Open Questions\s*$/m;
 const IMPLEMENTATION_ORDER_HEADING = /^##\s+Implementation order\s*$/im;
 const TESTING_STRATEGY_HEADING = /^##\s+Testing strategy\s*$/im;
+const QA_PLAN_HEADING = /^##\s+QA Plan\s*$/im;
 const NEXT_HEADING = /^##\s+\S/m;
 const UNCHECKED_TASK_ITEM = /^-\s*\[\s\]/m;
 
@@ -69,6 +70,30 @@ export function planHasTestingStrategySection(planPath: string): boolean {
   const content = readFileSync(planPath, "utf8");
   const body = sectionBody(content, TESTING_STRATEGY_HEADING);
   return body !== undefined && body.trim().length > 0;
+}
+
+/** True if the plan file has a non-empty `## QA Plan` section (planning-requirements update,
+ * 2026-09-03) — every plan states what `## Testing strategy`'s automated coverage already proves and
+ * what it can't, because it depends on a real external system, real timing, or human judgment.
+ * Required on every plan, same standing as `## Boundaries`/`## Testing strategy` — an explicit
+ * "None — automated coverage above is sufficient" is fine when genuinely true; a silently thin or
+ * absent section is not. See `docs://planning-procedure`'s "`## QA Plan`" subsection. */
+export function planHasQAPlanSection(planPath: string): boolean {
+  const content = readFileSync(planPath, "utf8");
+  const body = sectionBody(content, QA_PLAN_HEADING);
+  return body !== undefined && body.trim().length > 0;
+}
+
+/** The `## QA Plan` section's trimmed text, or undefined if missing/empty — used to surface it in a
+ * completion comment (both `docs://implementation-procedure`'s interactive report template and the
+ * headless watchdog's completion comment, decision #1: the orchestrator composes every comment, not
+ * the worker), so a human reviewer sees what manual QA remains without opening the plan file. */
+export function getQAPlanSectionText(planPath: string): string | undefined {
+  const content = readFileSync(planPath, "utf8");
+  const body = sectionBody(content, QA_PLAN_HEADING);
+  if (body === undefined) return undefined;
+  const trimmed = body.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
 }
 
 /** True if the plan file's `## Open Questions` section has any unresolved `- [ ]` item.

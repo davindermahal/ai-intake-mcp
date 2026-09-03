@@ -46,8 +46,8 @@ ls .ai/plans/active/<TICKET-KEY>-*.md
 ```
 
 Then: **Goal**, **Scope** (in/out), **Files to change** (one-line reason each), **Key decisions**,
-**Implementation order**, **Testing strategy**, **Boundaries**, **Open Questions**. Leave
-`**Status**: draft` — flipping to `ready` happens via the `approve_plan` tool, a separate human
+**Implementation order**, **Testing strategy**, **QA Plan**, **Boundaries**, **Open Questions**.
+Leave `**Status**: draft` — flipping to `ready` happens via the `approve_plan` tool, a separate human
 decision this planning session never makes itself.
 
 ### Write for a weaker executor
@@ -108,6 +108,37 @@ Add a short `## Testing strategy` section naming: which test command(s) this pro
 relies on), and, for each Implementation order group, a one-line note on what's being tested and how
 (pass path + fail/error path). This is required on every plan, same standing as `## Boundaries` — not
 optional, not something to add only when asked.
+
+### `## QA Plan` — required: automated coverage vs. what a human must verify
+
+`## Testing strategy` above proves the code's *logic* is correct against whatever the automated
+suite can observe — mocked APIs, fake dependencies, in-process assertions. It cannot prove the
+change actually works against anything the suite doesn't (or can't) exercise for real: a real
+external API/service, real timing, a real UI a human has to look at, a new unattended/scheduled
+process, real credentials, real file/process interaction. Every plan states, explicitly, both halves
+— what's already covered by `## Testing strategy`, and, separately, exactly what still needs a human
+to manually verify and how.
+
+Write each manual-verification item as a literal, checkable step — the same "write for a weaker
+executor" standard as `## Implementation order`: exact commands, exact URLs/UI paths a person clicks
+through, exact pass/fail criteria — never "verify it works" or "test thoroughly." Whoever executes
+this section may not be you, and may not even be technical beyond following exact steps.
+
+A plan whose manual-QA surface is genuinely large (multiple real-system integrations, a new
+unattended/scheduled process, anything a soak test would meaningfully validate, several distinct
+failure modes worth deliberately injecting) should split it into a companion QA plan file
+(`.ai/plans/active/<slug>-qa.md`, cross-linked from both directions — name it here, in this section,
+and add this plan to the QA plan's own "Related") rather than bloating this section past readability.
+`.ai/plans/active/headless-automation-qa.md` is the reference example of that shape: phased, each
+phase with an objective, literal steps, and explicit pass/fail criteria, ending in a sign-off
+checklist.
+
+If a change genuinely has no manual-QA surface at all (a pure internal refactor, nothing outside the
+existing automated suite's reach), say so outright — `"None — automated coverage above is
+sufficient, no real external system is touched by this change"` — rather than leaving the section
+thin or silently absent. Same standard as `## Boundaries`'s "none — full repo in scope": an explicit,
+deliberate "none" is fine; a thin or missing section is not, and is treated as a planning defect the
+same way a missing `## Boundaries` is.
 
 ### `## Open Questions` format — required, checked by `approve_plan`
 

@@ -223,7 +223,8 @@ afterEach(() => {
 });
 
 const COMPLETE_SECTIONS =
-  "\n## Implementation order\n\n1. Fix the thing.\n\n## Testing strategy\n\nRun `npm test`.\n";
+  "\n## Implementation order\n\n1. Fix the thing.\n\n## Testing strategy\n\nRun `npm test`.\n\n" +
+  "## QA Plan\n\nNone — automated coverage above is sufficient.\n";
 
 describe("integration: full planning -> implementation lifecycle across ticks", () => {
   it("dispatches planning, completes it cleanly to state:review, then implementation promotes Status and completes to state:verify", async () => {

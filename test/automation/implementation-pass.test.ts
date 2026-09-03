@@ -80,7 +80,8 @@ afterEach(() => {
 });
 
 const COMPLETE_SECTIONS =
-  "\n## Implementation order\n\n1. Fix the thing.\n\n## Testing strategy\n\nRun `npm test`.\n";
+  "\n## Implementation order\n\n1. Fix the thing.\n\n## Testing strategy\n\nRun `npm test`.\n\n" +
+  "## QA Plan\n\nNone — automated coverage above is sufficient.\n";
 
 async function seedPlan(ticketKey: string, status: string, extra = COMPLETE_SECTIONS): Promise<string> {
   const worktree = await worktreeCreate(ticketKey, async () => "Fix the thing", repoRoot);
@@ -175,6 +176,29 @@ describe("runImplementationPass", () => {
     expect(calls.some((c) => c.startsWith("POST") && c.includes("/comment"))).toBe(true);
     const labelsPut = calls.find((c) => c.startsWith("PUT") && c.includes("/issue/DAV-5") && !c.includes("assignee"));
     expect(labelsPut).toBeDefined();
+  });
+
+  it("bounces to state:review when a draft plan is missing only the QA Plan section", async () => {
+    await seedPlan(
+      "DAV-5",
+      "draft",
+      "\n## Implementation order\n\n1. Fix the thing.\n\n## Testing strategy\n\nRun `npm test`.\n",
+    );
+    const fetchImpl = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      const body = init?.body ? (JSON.parse(init.body as string) as { jql?: string }) : {};
+      if (body.jql) return jsonResponse({ issues: [issueJson("DAV-5", ["state:implement", "app:my-repo"])] });
+      if (url.includes("/issue/DAV-5?")) return jsonResponse(issueJson("DAV-5", ["state:implement", "app:my-repo"]));
+      if (url.endsWith("/myself")) return jsonResponse({ accountId: "me" });
+      return jsonResponse(undefined, 204);
+    });
+    const launch = vi.fn();
+
+    const result = await runImplementationPass(makeCtx(fetchImpl, launch));
+
+    expect(result.dispatched).toBeUndefined();
+    expect(result.bounced).toEqual(["DAV-5"]);
+    expect(launch).not.toHaveBeenCalled();
   });
 
   it("does nothing when the implementation concurrency cap (1) is already occupied", async () => {

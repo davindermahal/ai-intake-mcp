@@ -117,7 +117,8 @@ function makeCtx(fetchImpl: typeof fetch, launch = vi.fn().mockReturnValue({ pid
 }
 
 const COMPLETE_SECTIONS =
-  "\n## Implementation order\n\n1. Fix the thing.\n\n## Testing strategy\n\nRun `npm test`.\n";
+  "\n## Implementation order\n\n1. Fix the thing.\n\n## Testing strategy\n\nRun `npm test`.\n\n" +
+  "## QA Plan\n\nNone — automated coverage above is sufficient.\n";
 
 async function seedPlan(ticketKey: string, extra: string, openQuestions = ""): Promise<string> {
   const worktree = await worktreeCreate(ticketKey, async () => "Fix the thing", repoRoot);
@@ -254,6 +255,28 @@ describe("runWatchdogPass — dead planning worker, result present", () => {
     expect(promptContent).toContain("Correction from your previous attempt");
   });
 
+  it("retries with a correction note when only the QA Plan section is missing", async () => {
+    await seedPlan("DAV-5", "\n## Implementation order\n\n1. Fix the thing.\n\n## Testing strategy\n\nRun `npm test`.\n");
+    deadPids.add(99999);
+    writeMarker("my-app", baseMarker({ pid: 99999, attempts: 1 }), stateRoot);
+    writeResult("my-app", "DAV-5", { outcome: "done" });
+
+    const fetchImpl = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("/issue/DAV-5?")) return issueResponse("DAV-5", ["state:plan", "app:my-repo"]);
+      return jsonResponse(undefined, 204);
+    });
+    const launch = vi.fn().mockReturnValue({ pid: 2, logPath: "/log" });
+
+    const result = await runWatchdogPass(makeCtx(fetchImpl, launch));
+
+    expect(result.restarted).toEqual(["DAV-5"]);
+    expect(result.completed).toEqual([]);
+    const options = launch.mock.calls[0]?.[1] as Record<string, unknown>;
+    const promptContent = readFileSync(options.promptPath as string, "utf8");
+    expect(promptContent).toContain("QA Plan");
+  });
+
   it("escalates immediately when the worker reported a blocker", async () => {
     deadPids.add(99999);
     writeMarker("my-app", baseMarker({ pid: 99999 }), stateRoot);
@@ -296,6 +319,34 @@ describe("runWatchdogPass — dead implementation worker, result present", () =>
     expect(result.completed).toEqual(["DAV-9"]);
     expect(readMarker("my-app", "DAV-9", stateRoot)).toBeUndefined();
     expect(calls.some((c) => c.includes("/comment"))).toBe(true);
+  });
+
+  it("includes the plan's QA Plan section in the completion comment when one exists", async () => {
+    await seedPlan(
+      "DAV-9",
+      "\n## Implementation order\n\n1. Fix the thing.\n\n## Testing strategy\n\nRun `npm test`.\n\n" +
+        "## QA Plan\n\nManually verify the real endpoint returns 200.\n",
+    );
+    deadPids.add(99999);
+    writeMarker("my-app", baseMarker({ ticketKey: "DAV-9", phase: "implementation", pid: 99999 }), stateRoot);
+    writeResult("my-app", "DAV-9", { outcome: "success", summary: "Added the endpoint.", verify: "make test passed" });
+
+    let commentBody: unknown;
+    const fetchImpl = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.includes("/issue/DAV-9?")) return issueResponse("DAV-9", ["state:working", "app:my-repo"]);
+      if (url.endsWith("/myself")) return jsonResponse({ accountId: "me" });
+      if (url.endsWith("/comment") && init?.body) {
+        commentBody = (JSON.parse(init.body as string) as { body: unknown }).body;
+      }
+      return jsonResponse(undefined, 204);
+    });
+
+    await runWatchdogPass(makeCtx(fetchImpl));
+
+    const { adfToPlainText } = await import("../../src/jira/adf.js");
+    expect(adfToPlainText(commentBody)).toContain("Manual QA still needed");
+    expect(adfToPlainText(commentBody)).toContain("Manually verify the real endpoint returns 200.");
   });
 
   it("posts a blocked comment and transitions to problem on a blocked outcome", async () => {

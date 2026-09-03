@@ -55,8 +55,8 @@ ls .ai/plans/active/{{TICKET_KEY}}-*.md
 ```
 
 Then: **Goal**, **Scope** (in/out), **Files to change** (one-line reason each), **Key decisions**,
-**Implementation order**, **Testing strategy**, **Boundaries**, **Open Questions**. Leave
-`**Status**: draft` — nothing in this session ever flips it to `ready`; that's a separate human
+**Implementation order**, **Testing strategy**, **QA Plan**, **Boundaries**, **Open Questions**.
+Leave `**Status**: draft` — nothing in this session ever flips it to `ready`; that's a separate human
 approval step.
 
 ### Write for a weaker executor
@@ -117,6 +117,26 @@ Add a short `## Testing strategy` section naming: which test command(s) this pro
 (from `.ai/intake-mcp.md`/`make test`), and, for each Implementation order group, a one-line note on
 what's being tested and how (pass path + fail/error path). This is required on every plan, same
 standing as `## Boundaries` — not optional, not something to add only when asked.
+
+### `## QA Plan` — required: automated coverage vs. what a human must verify
+
+`## Testing strategy` above proves the code's *logic* is correct against whatever the automated
+suite can observe — mocked APIs, fake dependencies, in-process assertions. It cannot prove the change
+actually works against anything the suite doesn't (or can't) exercise for real: a real external
+API/service, real timing, a real UI a human has to look at, a new unattended/scheduled process, real
+credentials, real file/process interaction. State both halves explicitly — what `## Testing strategy`
+already covers, and, separately, exactly what still needs a human to manually verify and how.
+
+Write each manual-verification item as a literal, checkable step — same standard as `##
+Implementation order`: exact commands, exact URLs/UI paths, exact pass/fail criteria, never "verify
+it works." If the manual-QA surface is genuinely large, name a companion QA plan file instead of
+inlining it all here (same idea as splitting a large plan's own detail into a separate document) —
+but still say so in this section, don't just omit it.
+
+If a change genuinely has no manual-QA surface at all, say so outright — `"None — automated coverage
+above is sufficient, no real external system is touched by this change"` — rather than leaving the
+section thin or absent. Same standard as `## Boundaries`'s "none — full repo in scope": an explicit
+"none" is fine; a thin or missing section is a planning defect.
 
 ### `## Open Questions` format — required
 
