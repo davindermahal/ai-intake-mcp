@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import type { GlobalConfig } from "../config.js";
 import type { JiraClient } from "../jira/client.js";
-import { addComment, fetchIssue, transitionState } from "../jira/tags.js";
+import { fetchIssue } from "../jira/tags.js";
 import {
   findPlanFile,
   planHasImplementationOrderSection,
@@ -10,8 +10,9 @@ import {
 } from "../plan-file.js";
 import { findWorktreeForTicket } from "../worktree.js";
 import { type DispatchContext, dispatchWorker } from "./dispatch.js";
+import { maybeAddComment, maybeDeleteMarker, maybeTransition, maybeWriteMarker } from "./dry-run.js";
 import { AUTOMATION_COMMENT_FOOTER } from "./footer.js";
-import { deleteMarker, listMarkers, writeMarker, type WorkerMarker } from "./markers.js";
+import { listMarkers, type WorkerMarker } from "./markers.js";
 import { composeHeartbeat, readProgressSince } from "./progress-log.js";
 import {
   progressLogPath,
@@ -56,13 +57,14 @@ async function escalate(
   message: string,
   result: WatchdogPassResult,
 ): Promise<void> {
-  await addComment(
+  await maybeAddComment(
+    ctx,
     ctx.client,
     marker.ticketKey,
     `Escalating: ${message} Please check in on this ticket manually.`,
     AUTOMATION_COMMENT_FOOTER,
   );
-  writeMarker(ctx.project.name, { ...marker, escalated: true }, ctx.stateRoot);
+  maybeWriteMarker(ctx, ctx.project.name, { ...marker, escalated: true }, ctx.stateRoot);
   result.escalated.push(marker.ticketKey);
 }
 
@@ -112,9 +114,10 @@ async function maybePostHeartbeat(
     entries.length > 0 ? undefined : readProgressSince(logPath, 0).entries.at(-1)?.next;
 
   const body = composeHeartbeat({ entries, lastKnownNext });
-  await addComment(ctx.client, marker.ticketKey, body, AUTOMATION_COMMENT_FOOTER);
+  await maybeAddComment(ctx, ctx.client, marker.ticketKey, body, AUTOMATION_COMMENT_FOOTER);
 
-  writeMarker(
+  maybeWriteMarker(
+    ctx,
     ctx.project.name,
     { ...marker, lastHeartbeatAt: now.toISOString(), progressReadPosition: readPosition },
     ctx.stateRoot,
@@ -158,10 +161,10 @@ async function finishPlanningWorker(
     : `Plan ready for review at \`${planPath}\`.`;
 
   const issue = await fetchIssue(ctx.client, marker.ticketKey);
-  await addComment(ctx.client, marker.ticketKey, `${heading}\n\n${planText}`, AUTOMATION_COMMENT_FOOTER);
-  await transitionState(ctx.client, issue, target, ctx.config);
+  await maybeAddComment(ctx, ctx.client, marker.ticketKey, `${heading}\n\n${planText}`, AUTOMATION_COMMENT_FOOTER);
+  await maybeTransition(ctx, ctx.client, issue, target, ctx.config);
 
-  deleteMarker(ctx.project.name, marker.ticketKey, ctx.stateRoot);
+  maybeDeleteMarker(ctx, ctx.project.name, marker.ticketKey, ctx.stateRoot);
   result.completed.push(marker.ticketKey);
 }
 
@@ -182,18 +185,18 @@ async function finishImplementationWorker(
       (summary ? `What changed: ${summary}\n` : "") +
       (verify ? `Verify: ${verify}\n` : "") +
       `\nReady for your review: check out the branch, review the diff, and merge when satisfied.`;
-    await addComment(ctx.client, marker.ticketKey, body, AUTOMATION_COMMENT_FOOTER);
-    await transitionState(ctx.client, issue, "verify", ctx.config);
+    await maybeAddComment(ctx, ctx.client, marker.ticketKey, body, AUTOMATION_COMMENT_FOOTER);
+    await maybeTransition(ctx, ctx.client, issue, "verify", ctx.config);
   } else {
     const body =
       `Implementation blocked.\n\n` +
       (whatHappened ? `What happened: ${whatHappened}\n` : "") +
       (summary ? `What's done so far: ${summary}\n` : "");
-    await addComment(ctx.client, marker.ticketKey, body, AUTOMATION_COMMENT_FOOTER);
-    await transitionState(ctx.client, issue, "problem", ctx.config);
+    await maybeAddComment(ctx, ctx.client, marker.ticketKey, body, AUTOMATION_COMMENT_FOOTER);
+    await maybeTransition(ctx, ctx.client, issue, "problem", ctx.config);
   }
 
-  deleteMarker(ctx.project.name, marker.ticketKey, ctx.stateRoot);
+  maybeDeleteMarker(ctx, ctx.project.name, marker.ticketKey, ctx.stateRoot);
   result.completed.push(marker.ticketKey);
 }
 

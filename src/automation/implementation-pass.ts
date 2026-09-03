@@ -1,18 +1,18 @@
 import type { GlobalConfig } from "../config.js";
 import type { JiraClient } from "../jira/client.js";
 import { buildDiscoveryJql, searchIssues } from "../jira/search.js";
-import { STATE_LABEL, addComment, currentStateLabel, fetchIssue, transitionState } from "../jira/tags.js";
+import { STATE_LABEL, currentStateLabel, fetchIssue } from "../jira/tags.js";
 import {
   findPlanFile,
   planHasImplementationOrderSection,
   planHasTestingStrategySection,
   planHasUnresolvedOpenQuestions,
   readPlanStatus,
-  setPlanStatus,
 } from "../plan-file.js";
 import type { RepoConfig } from "../repo-context.js";
 import { worktreeCreate } from "../worktree.js";
 import { type DispatchContext, dispatchWorker } from "./dispatch.js";
+import { maybeAddComment, maybeSetPlanStatus, maybeTransition } from "./dry-run.js";
 import { AUTOMATION_COMMENT_FOOTER } from "./footer.js";
 import { canDispatchImplementation, readMarker } from "./markers.js";
 
@@ -80,12 +80,12 @@ export async function runImplementationPass(ctx: ImplementationPassContext): Pro
 
       if (missing.length > 0) {
         const freshIssue = await fetchIssue(ctx.client, candidate.key);
-        await addComment(ctx.client, candidate.key, bounceMessage(missing), AUTOMATION_COMMENT_FOOTER);
-        await transitionState(ctx.client, freshIssue, "review", ctx.config);
+        await maybeAddComment(ctx, ctx.client, candidate.key, bounceMessage(missing), AUTOMATION_COMMENT_FOOTER);
+        await maybeTransition(ctx, ctx.client, freshIssue, "review", ctx.config);
         bounced.push(candidate.key);
         continue;
       }
-      setPlanStatus(planPath, "ready");
+      maybeSetPlanStatus(ctx, planPath, "ready");
     } else if (status !== "ready" && status !== "active") {
       continue;
     }
@@ -93,13 +93,14 @@ export async function runImplementationPass(ctx: ImplementationPassContext): Pro
     const freshIssue = await fetchIssue(ctx.client, candidate.key);
     const currentState = currentStateLabel(freshIssue.labels);
     if (currentState === STATE_LABEL.implement) {
-      await addComment(
+      await maybeAddComment(
+        ctx,
         ctx.client,
         candidate.key,
         startMessage(worktree.branch, worktree.worktreePath, planPath),
         AUTOMATION_COMMENT_FOOTER,
       );
-      await transitionState(ctx.client, freshIssue, "working", ctx.config);
+      await maybeTransition(ctx, ctx.client, freshIssue, "working", ctx.config);
     }
 
     await dispatchWorker(ctx, freshIssue, "implementation", 1);

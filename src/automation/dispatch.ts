@@ -38,6 +38,8 @@ export interface DispatchContext {
   stateRoot?: string;
   /** Test seam (decision #21) — defaults to actually spawning `claude`/`gemini`. */
   launch?: LaunchFn;
+  /** `--dry-run` (decision #21) — logs what would launch instead of actually spawning a provider. */
+  dryRun?: boolean;
 }
 
 export interface DispatchResult {
@@ -89,6 +91,18 @@ export async function dispatchWorker(
     ctx.project.overrides,
     resolvedProvider.provider,
   );
+
+  if (ctx.dryRun) {
+    console.log(
+      `[dry-run] would launch ${resolvedProvider.provider} for ${issue.key} (${phase}, attempt ${attempts}) ` +
+        `— prompt written to ${promptPath}`,
+    );
+    return {
+      worktree,
+      launchResult: { pid: -1, logPath: promptPath },
+      provider: resolvedProvider.provider,
+    };
+  }
 
   const launchFn = ctx.launch ?? defaultLaunch;
   const launchResult = launchFn(resolvedProvider.provider, {
