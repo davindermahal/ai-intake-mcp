@@ -2,16 +2,17 @@
 
 **Status**: active — Phases 1-7 implemented on branch `headless-automation` (all `npm test`/lint/
 typecheck green throughout, TDD per decision #22). Remaining before this can run unattended: a
-human review of the diff/design, then decision #21's last verification layer — a `--dry-run` run
-against the real, live Jira board (`scripts/automation-poll.sh --dry-run` / `npm run automation-poll
--- --dry-run`), which needs real credentials and can't be exercised from an implementation session.
-See "Implementation Order" below for what each phase covers.
+human review of the diff/design, then decision #21's last verification layer — real-system
+validation, now its own plan: `.ai/plans/active/headless-automation-qa.md`. See "Implementation
+Order" below for what each phase of *this* plan covers.
 
 **Created**: 2026-09-02
-**Updated**: 2026-09-02
+**Updated**: 2026-09-03
 
 
-**Related**: `.ai/plans/active/ai-intake-mcp-on-demand-planning.md` (v1, interactive planning),
+**Related**: `.ai/plans/active/headless-automation-qa.md` (the end-to-end validation plan for
+everything implemented here — real Jira, real provider CLIs, real failure injection, not just the
+mocked/simulated coverage `npm test` already gives), `.ai/plans/active/ai-intake-mcp-on-demand-planning.md` (v1, interactive planning),
 `.ai/plans/active/ai-intake-mcp-implementation-phase.md` (interactive implementation — especially
 decision #1, "no container/DB isolation, `make <target>` from inside the worktree," which this
 plan's concurrency cap directly follows from), `.ai/guides/ai-intake-mcp-vs-harness.md` (§"Open

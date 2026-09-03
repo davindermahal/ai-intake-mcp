@@ -11,6 +11,12 @@ For the full design record (all 22 decisions, why each piece exists), see
 just the practical "how do I actually try this" path. It assumes the interactive setup in
 [`setup.md`](setup.md) is already done and working (`npm run health-check` passes).
 
+**For a rigorous, checkable validation pass before trusting this unattended against a real repo**,
+follow [`.ai/plans/active/headless-automation-qa.md`](../.ai/plans/active/headless-automation-qa.md)
+instead of just this doc — it turns the steps below into a phased plan with explicit pass/fail
+criteria, including failure-injection (crash/restart/escalate, permission sandbox, cron overlap) and
+a multi-day soak test. This doc remains the quick version for a one-off try.
+
 ## What this adds
 
 Everything in [`usage.md`](usage.md) still works unchanged — headless automation is a second,
