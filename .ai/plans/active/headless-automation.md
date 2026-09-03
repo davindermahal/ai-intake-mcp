@@ -1,8 +1,9 @@
-# Plan (draft): headless automation mode for `ai-intake-mcp`
+# Plan: headless automation mode for `ai-intake-mcp`
 
-**Status**: draft — architecture discussion captured, not scheduled
+**Status**: active — implementation underway, phased (see "Implementation Order" below)
 
 **Created**: 2026-09-02
+**Updated**: 2026-09-02
 
 
 **Related**: `.ai/plans/active/ai-intake-mcp-on-demand-planning.md` (v1, interactive planning),
@@ -850,3 +851,129 @@ resolved, pending discussion.
 - ~~Whether every provider in the harness's `lib/ai/*.sh` set needs a headless TS adapter for
   v1~~ — **resolved: Claude and Gemini both ship for v1** (decision #14); Codex, Antigravity, and
   local-LLM stay contract-supported but deferred, added on demand later.
+
+## Implementation Order
+
+Per decision #22 (TDD required, structural on every plan this tool produces — including this one),
+grouped into phases. Each phase is its own commit (or short commit sequence) on the
+`headless-automation` branch; a phase's tests must pass, and the full existing suite must stay
+green, before the next phase starts. `docs://implementation-procedure`'s red→green pairing applies
+to every step below: write the failing test first, then the minimal code to pass it.
+
+**Phase 1 — foundational data/config layer** (no live Jira calls beyond the existing pattern, no AI
+provider, no cron). Everything here is pure logic or file I/O, following
+`test/tools/implement-ticket.test.ts`'s real-`git`/mocked-`fetch` pattern where Jira is involved.
+1. `jiraProjectKeys` schema migration (decision #6): `RepoConfig` gains `jiraProjectKeys: string[]`;
+   `readRepoConfig` accepts the new array field or the legacy singular `jiraProjectKey` string
+   (normalized to a one-element array) for backward compat with already-committed config files;
+   `writeRepoConfig` always writes the array form. Update `tracker_get_issue`'s guardrail
+   (`src/tools/tracker-get-issue.ts`) to check membership in the list. Update `write_repo_config`
+   (`src/tools/write-repo-config.ts`) and its `src/index.ts` tool schema to accept/write the list.
+   Test: legacy-singular read, array read, malformed-file rejection, guardrail pass/fail on
+   multi-key membership.
+2. Structural plan-file gates (decisions #17/#22): `planHasImplementationOrderSection` and
+   `planHasTestingStrategySection` in `src/plan-file.ts`, same shape as the existing
+   `planHasBoundariesSection`/`planHasUnresolvedOpenQuestions` (heading present + section non-empty
+   until the next `##` heading). Wire both into `approve_plan` (`src/tools/approve-plan.ts`)
+   alongside its existing Open-Questions check. Test: each check's true/false cases plus the
+   "mid-sentence mention doesn't count" / "content after a later heading doesn't count" cases the
+   existing two checks already cover, and `approve_plan`'s refusal message for each new gate.
+3. Global `settings.json` loader (decision #13) and `projects.json` registry loader (decision #7),
+   plus per-project override resolution — `src/automation/settings.ts` /
+   `src/automation/registry.ts`, same `~/.config/ai-intake-mcp/` home as `src/config.ts`. Defaults
+   baked in (`concurrency.planning: 3`, watchdog grace/heartbeat/maxAttempts per phase, permission
+   profile paths) so a missing file is valid (empty registry, all-default settings), matching
+   `loadGlobalConfig`'s "file optional, env/defaults fill gaps" precedent. Test: default-only load,
+   per-project `overrides` merge (each field independently, per decision #7's "open bag"), malformed
+   JSON rejection.
+4. Per-project running-slot marker scheme + both concurrency checks (decisions #5/#8) —
+   `src/automation/markers.ts`: read/write/delete a
+   `~/.config/ai-intake-mcp/state/<project>/workers/<KEY>.json` marker; `countMarkersByPhase`; a
+   `canDispatchPlanning` check (count vs. resolved `concurrency.planning` cap) and a
+   `canDispatchImplementation` check (fixed structural cap of 1, decision #4/#5 — not
+   config-overridable). Test: marker CRUD round-trip, cap enforcement at/under/over the limit,
+   per-project isolation (two projects' counts never share a cap).
+
+**Phase 2 — discovery & signals** (still no AI provider, no cron; first live-Jira-shaped pure logic
+built on the existing `fetchIssue`/mocked-`fetch` pattern).
+5. Multi-key JQL search builder + `tracker_search` equivalent (decision #6's "new work" item) in
+   `src/jira/`: `project in (...) AND labels = "app:X" AND labels = "state:Y" AND assignee =
+   currentUser() ORDER BY created ASC`, spanning a repo's whole `jiraProjectKeys` collection in one
+   query. Test: query-string construction for one key / multiple keys / multiple state labels.
+6. Comment-fingerprint re-pickup check (decision #18): scan `issue.comments` for the last comment
+   matching the stable `"via ai-intake-mcp_"` substring of `commentFooter`'s output, then check for
+   any non-matching comment after it. Test: no automation comment yet, author reply after last
+   automation comment, no reply since last automation comment, reply from automation itself
+   (shouldn't count).
+7. Progress-log reader + heartbeat composer (decision #16): parse `Done`/`Next` entries from a
+   `.log` file since a given read position (line count), compose a heartbeat comment body, and the
+   "nothing new — restate last Next" fallback. Test: fresh entries since position, no new entries
+   (fallback), malformed/missing file.
+
+**Phase 3 — provider adapter layer** (decision #14; `node:child_process` mocked per decision #21 —
+never a real CLI invocation in tests).
+8. Provider adapter contract (`src/ai/provider.ts`) + Claude adapter (`src/ai/claude.ts`) +
+   Gemini adapter (`src/ai/gemini.ts`): launch a detached headless run given a prompt file, a
+   worktree, a resolved permission-profile path, optional model override; return `{ pid, logPath }`.
+   Test (per adapter): correct command/args/env/permission-flag construction, marker fields written.
+9. Permission-profile materialization (decision #9): one global Claude JSON path (no write needed,
+   just resolution) and one-time Gemini TOML sync to `~/.gemini/policies/ai-intake-mcp-headless.toml`
+   with every rule `interactive = false`. Test: TOML content shape, idempotent re-sync.
+10. Per-phase/per-ticket provider selection (decision #14): resolve `ai-plan-<profile>`/
+    `ai-impl-<profile>` Jira labels against `settings.json`'s `aiProfiles`, falling back to a
+    project's `overrides` default, then the global default. Test: label present / absent / unknown
+    profile name (error).
+
+**Phase 4 — headless prompts & result protocol.**
+11. `prompts/headless-planning.md` / `prompts/headless-implementation.md` (decision #15), quoting
+    `docs://planning-procedure` §§1-4 and its `## Testing strategy` requirement verbatim (decision
+    #22) rather than paraphrasing; both include the progress-log-append instruction (decision #16).
+    No unit test (content, not logic) — validated by Phase 6's dry-run + Phase 7's integration test.
+12. Result-file protocol (decision #1): a small typed reader/writer (`src/automation/result-file.ts`)
+    for the plan-decision / impl-outcome shapes a headless worker writes and the orchestrator reads.
+    Test: round-trip write/read, malformed-file rejection.
+
+**Phase 5 — orchestrator passes** (decisions #2/#3/#10/#12, plus #17's implementation-time
+`Status: draft → ready` promotion). The core sequential per-project loop:
+13. Planning pass (decision #2/#18): dispatch new `state:plan` + re-pickup `state:needs-input`
+    matches, respecting Phase 1's planning concurrency cap; orchestrator (not the AI) reads the
+    committed plan file back out and posts it as a Jira comment; runs the new structural gates
+    (Phase 1 item 2) before ever transitioning/commenting — failure path per decision #17 (watchdog
+    retry with injected correction note, not `needs-input`).
+14. Implementation pass (decision #3/#17): dispatch one ticket per project (fixed cap), start
+    comment, first-touch `Status: draft → ready` promotion re-running the same structural gates
+    (bounce to `state:review` with an explanatory comment on failure — decision #17's Review Finding
+    #3.2 resolution), completion comment, transition on success/failure.
+15. Watchdog pass (decision #12): sweep every marker under a project's `workers/` dir; dead-PID
+    grace/restart/escalate per phase, heartbeat comments for alive workers (Phase 2 item 7's
+    composer), escalation marking (decision #12's `escalated: true`).
+    Test for 13-15: the integration harness (item 18 below) is what actually exercises these
+    end-to-end; unit-level, each pass's dispatch/skip/escalate decision logic is tested in isolation
+    with a fake clock and canned marker/issue fixtures.
+
+**Phase 6 — registry, wizard, cron entrypoint.**
+16. App-tag collision check (decision #20) — live Jira query + classification (fresh tag / same-repo
+    re-registration / collision) against `projects.json`. Test: all three classifications plus the
+    "Jira query failed → fail closed" case.
+17. Registration wizard (decision #20's six-step flow) and the cron entrypoint with `flock -n`
+    overlap guard (decision #19) and `--dry-run` (decision #21) wired to the sequential
+    three-sub-pass-per-project loop (decision #10).
+
+**Phase 7 — integration test harness + dry-run validation** (decision #21's remaining two layers):
+18. Integration test: mocked Jira client + fake provider adapter (canned result files: success /
+    blocked / simulated stall) driving multiple simulated cron ticks — concurrency cap skip,
+    dead-PID restart→escalate after 3 attempts, heartbeat composition from progress-log entries,
+    `Status` promotion on first implementation touch.
+19. `--dry-run` run against the real board, `app:ai-intake-mcp`'s own self-hosted registration as
+    the first real dogfood target (decision #21) — a human-reviewed step before ever running
+    unattended, not automated.
+
+## Testing strategy
+
+Test command: `npm test` (vitest). Every phase above follows red→green: a failing test for each new
+piece of pure logic or file I/O before the code that satisfies it, and the full suite (`npm test`)
+must stay green at the end of every phase before starting the next. Provider adapters (Phase 3) and
+the cron entrypoint/wizard (Phase 6) are exercised with mocked `node:child_process`/mocked Jira
+`fetch` only — never a real AI CLI invocation or a real network call in the unit/integration suite
+(decision #21). The only real-network step in this whole plan is Phase 7's `--dry-run` against the
+live board, which is a manual, human-reviewed validation step, not part of `npm test`.
