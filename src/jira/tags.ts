@@ -82,7 +82,7 @@ interface RawJiraComment {
   created?: string;
 }
 
-interface RawJiraIssue {
+export interface RawJiraIssue {
   key: string;
   fields: {
     summary: string;
@@ -94,10 +94,9 @@ interface RawJiraIssue {
   };
 }
 
-export async function fetchIssue(client: JiraClient, key: string): Promise<JiraIssue> {
-  const raw = await client.get<RawJiraIssue>(
-    `/rest/api/3/issue/${encodeURIComponent(key)}?fields=summary,status,description,comment,labels,assignee,project`,
-  );
+/** Shared by `fetchIssue` (one ticket) and `searchIssues` (`src/jira/search.ts`, many tickets from
+ * one JQL query) — both return the Jira API's issue shape, just via different endpoints. */
+export function rawIssueToJiraIssue(raw: RawJiraIssue): JiraIssue {
   return {
     key: raw.key,
     projectKey: raw.key.split("-")[0] ?? "",
@@ -112,6 +111,13 @@ export async function fetchIssue(client: JiraClient, key: string): Promise<JiraI
     labels: raw.fields.labels ?? [],
     assigneeAccountId: raw.fields.assignee?.accountId ?? null,
   };
+}
+
+export async function fetchIssue(client: JiraClient, key: string): Promise<JiraIssue> {
+  const raw = await client.get<RawJiraIssue>(
+    `/rest/api/3/issue/${encodeURIComponent(key)}?fields=summary,status,description,comment,labels,assignee,project`,
+  );
+  return rawIssueToJiraIssue(raw);
 }
 
 export async function currentAccountId(client: JiraClient): Promise<string> {
