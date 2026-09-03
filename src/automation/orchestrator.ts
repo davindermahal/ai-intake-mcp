@@ -23,6 +23,7 @@ export interface OrchestratorContext {
   stateRoot?: string;
   launch?: LaunchFn;
   now?: () => Date;
+  dryRun?: boolean;
 }
 
 export interface ProjectPassesResult {

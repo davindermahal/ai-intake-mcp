@@ -1,6 +1,6 @@
-import { readFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { basename, join } from "node:path";
+import { basename, dirname, join } from "node:path";
 
 /**
  * Global project registry (decision #7, headless-automation plan) — `ai-intake-mcp`'s interactive
@@ -97,4 +97,29 @@ export function loadProjectRegistry(): ProjectRegistry {
 
   const rawProjects = (parsed as { projects: unknown[] }).projects;
   return { projects: rawProjects.map((p, i) => parseProjectEntry(p, i)) };
+}
+
+/** Writes the registry back to `~/.config/ai-intake-mcp/projects.json`, pretty-printed. */
+export function saveProjectRegistry(registry: ProjectRegistry): void {
+  mkdirSync(dirname(REGISTRY_PATH), { recursive: true });
+  const serializable = {
+    projects: registry.projects.map((p) => ({
+      path: p.path,
+      name: p.name,
+      enabled: p.enabled,
+      ...(p.overrides !== undefined ? { overrides: p.overrides } : {}),
+    })),
+  };
+  writeFileSync(REGISTRY_PATH, `${JSON.stringify(serializable, null, 2)}\n`, "utf8");
+}
+
+/** Idempotent on repo path (decision #20's registration wizard, step 5) — registering the same path
+ * again replaces that entry in place rather than appending a duplicate. Returns a new registry;
+ * doesn't mutate the one passed in. */
+export function upsertProject(registry: ProjectRegistry, entry: ProjectEntry): ProjectRegistry {
+  const index = registry.projects.findIndex((p) => p.path === entry.path);
+  if (index === -1) return { projects: [...registry.projects, entry] };
+  const projects = [...registry.projects];
+  projects[index] = entry;
+  return { projects };
 }

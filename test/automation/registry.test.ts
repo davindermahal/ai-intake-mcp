@@ -1,11 +1,22 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { ProjectEntry, ProjectRegistry } from "../../src/automation/registry.js";
 
-// registry.ts reads a hardcoded ~/.config/ai-intake-mcp/projects.json path — same seam/rationale
-// as test/config.test.ts's mock of node:fs's readFileSync.
-const { readFileSyncMock } = vi.hoisted(() => ({ readFileSyncMock: vi.fn() }));
-vi.mock("node:fs", () => ({ readFileSync: readFileSyncMock }));
+// registry.ts reads/writes a hardcoded ~/.config/ai-intake-mcp/projects.json path — same
+// seam/rationale as test/config.test.ts's mock of node:fs's readFileSync.
+const { readFileSyncMock, writeFileSyncMock, mkdirSyncMock } = vi.hoisted(() => ({
+  readFileSyncMock: vi.fn(),
+  writeFileSyncMock: vi.fn(),
+  mkdirSyncMock: vi.fn(),
+}));
+vi.mock("node:fs", () => ({
+  readFileSync: readFileSyncMock,
+  writeFileSync: writeFileSyncMock,
+  mkdirSync: mkdirSyncMock,
+}));
 
-const { loadProjectRegistry } = await import("../../src/automation/registry.js");
+const { loadProjectRegistry, saveProjectRegistry, upsertProject } = await import(
+  "../../src/automation/registry.js"
+);
 
 function enoent(): NodeJS.ErrnoException {
   const err = new Error("no such file") as NodeJS.ErrnoException;
@@ -15,6 +26,8 @@ function enoent(): NodeJS.ErrnoException {
 
 beforeEach(() => {
   readFileSyncMock.mockReset();
+  writeFileSyncMock.mockReset();
+  mkdirSyncMock.mockReset();
   readFileSyncMock.mockImplementation(() => {
     throw enoent();
   });
@@ -83,5 +96,60 @@ describe("loadProjectRegistry", () => {
     const registry = loadProjectRegistry();
     expect(registry.projects.map((p) => p.name)).toEqual(["a", "b"]);
     expect(registry.projects.map((p) => p.enabled)).toEqual([true, false]);
+  });
+});
+
+describe("saveProjectRegistry", () => {
+  it("writes the registry as pretty-printed JSON, creating the config dir first", () => {
+    const registry: ProjectRegistry = {
+      projects: [{ path: "/x/a", name: "a", enabled: true, overrides: undefined }],
+    };
+    saveProjectRegistry(registry);
+
+    expect(mkdirSyncMock).toHaveBeenCalledTimes(1);
+    expect(writeFileSyncMock).toHaveBeenCalledTimes(1);
+    const [, written] = writeFileSyncMock.mock.calls[0] as [string, string];
+    expect(JSON.parse(written)).toEqual({
+      projects: [{ path: "/x/a", name: "a", enabled: true }],
+    });
+  });
+
+  it("includes overrides in the written entry when present", () => {
+    const registry: ProjectRegistry = {
+      projects: [{ path: "/x/a", name: "a", enabled: true, overrides: { concurrency: { planning: 1 } } }],
+    };
+    saveProjectRegistry(registry);
+
+    const [, written] = writeFileSyncMock.mock.calls[0] as [string, string];
+    expect(JSON.parse(written).projects[0]).toEqual({
+      path: "/x/a",
+      name: "a",
+      enabled: true,
+      overrides: { concurrency: { planning: 1 } },
+    });
+  });
+});
+
+describe("upsertProject", () => {
+  const entryA: ProjectEntry = { path: "/x/a", name: "a", enabled: true, overrides: undefined };
+  const entryB: ProjectEntry = { path: "/x/b", name: "b", enabled: true, overrides: undefined };
+
+  it("appends a new entry for a path not already registered", () => {
+    const registry: ProjectRegistry = { projects: [entryA] };
+    const updated = upsertProject(registry, entryB);
+    expect(updated.projects).toEqual([entryA, entryB]);
+  });
+
+  it("replaces the existing entry in place for an already-registered path (idempotent on path)", () => {
+    const registry: ProjectRegistry = { projects: [entryA, entryB] };
+    const renamedA: ProjectEntry = { ...entryA, name: "renamed-a" };
+    const updated = upsertProject(registry, renamedA);
+    expect(updated.projects).toEqual([renamedA, entryB]);
+  });
+
+  it("does not mutate the original registry object", () => {
+    const registry: ProjectRegistry = { projects: [entryA] };
+    upsertProject(registry, entryB);
+    expect(registry.projects).toEqual([entryA]);
   });
 });
