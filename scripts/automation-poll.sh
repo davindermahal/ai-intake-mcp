@@ -17,6 +17,35 @@ set -eu
 # usable as-is, exactly as docs/headless-automation.md's install instructions assume.
 export PATH="$HOME/.local/bin:/usr/local/bin:$PATH"
 
+# gemini-cli's own bundled code needs a Node new enough to support the regex "v" flag (ES2024) —
+# under Node 18 it fails immediately with "SyntaxError: Invalid regular expression flags" — and
+# gemini itself is typically installed *inside* a Node-version-manager's own directory tree (e.g.
+# nvm's ~/.nvm/versions/node/<version>/bin/), not a fixed, hardcodable path. Confirmed live: picking
+# the *highest installed Node version* is the wrong heuristic — global npm packages are scoped per
+# nvm version, so the newest Node isn't necessarily the one with the newest (or even a working)
+# gemini-cli; on the machine this was found on, the newest Node's gemini-cli was actually an older,
+# staler install than a lower Node version's. What we actually want is whichever nvm-managed
+# version has the newest working gemini-cli — its paired Node comes along for free and is
+# guaranteed new enough, since gemini-cli already runs successfully there. A no-op wherever nvm
+# isn't installed or none of its versions have gemini.
+if [ -d "$HOME/.nvm/versions/node" ]; then
+    BEST_GEMINI_DIR=""
+    BEST_GEMINI_VERSION=""
+    for d in "$HOME"/.nvm/versions/node/*/; do
+        if [ -x "${d}bin/gemini" ]; then
+            v=$("${d}bin/node" "${d}bin/gemini" --version 2>/dev/null) || continue
+            if [ -z "$BEST_GEMINI_VERSION" ] \
+                || [ "$(printf '%s\n%s\n' "$BEST_GEMINI_VERSION" "$v" | sort -V | tail -n1)" = "$v" ]; then
+                BEST_GEMINI_VERSION="$v"
+                BEST_GEMINI_DIR="${d}bin"
+            fi
+        fi
+    done
+    if [ -n "$BEST_GEMINI_DIR" ]; then
+        export PATH="$BEST_GEMINI_DIR:$PATH"
+    fi
+fi
+
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 LOCK_PATH="${HOME}/.config/ai-intake-mcp/state/automation.lock"
 mkdir -p "$(dirname "$LOCK_PATH")"

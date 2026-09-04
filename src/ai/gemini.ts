@@ -24,9 +24,21 @@ export const GEMINI_PROVIDER_NAME = "gemini";
  * live during Phase E to be required — headless file-tool access is confined to the worktree by
  * default, and the worker's context/progress/result files live under the state tree instead.
  * `--include-directories` is gemini-cli's documented equivalent ("Additional directories to include
- * in the workspace"); added on the same reasoning but **not yet live-confirmed** for Gemini
- * specifically — this account's Google AI Studio billing was blocking real Gemini calls at the time
- * this was written. Re-verify once a real Gemini planning/implementation cycle actually runs.
+ * in the workspace"). Confirmed live (once this account's Gemini billing was resolved): with only
+ * this flag, gemini-cli still ran in its default `approval-mode` (interactive confirmation), and
+ * since nothing is present to confirm, it never even attempted a write — it just described what it
+ * *would* have written in its response text instead of calling any tool at all.
+ *
+ * `--approval-mode yolo`: fixes the above — confirmed live to make real file writes succeed.
+ * `auto_edit` (the narrower mode, auto-approving only edit tools) was tried first and rejected: it
+ * still refuses all shell/Bash tool calls outright ("a shell command execution tool is not available
+ * in this workspace"), which this project's own headless prompts require (`git add`/`commit`,
+ * `make test`/`build`) — so only the broadest mode actually works for this pipeline. This is safe
+ * for the same reason Claude's broad `allow` list plus explicit `deny` rules is (decision #9): the
+ * actual safety net here is the machine-global TOML policy synced by `syncGeminiPolicy`
+ * (`src/ai/gemini-policy.ts`) — a `decision = "deny"` rule in that policy engine refuses a matching
+ * tool call outright, independent of `approval-mode` (which only governs the interactive-confirm
+ * path for calls the policy hasn't already decided); `--approval-mode` never overrides it.
  */
 export function launchGemini(options: LaunchOptions): LaunchResult {
   return launchProvider(options, (promptContent, opts) => {
@@ -36,6 +48,8 @@ export function launchGemini(options: LaunchOptions): LaunchResult {
       "--skip-trust",
       "--include-directories",
       opts.stateRoot ?? DEFAULT_STATE_ROOT,
+      "--approval-mode",
+      "yolo",
     ];
     if (opts.model) args.push("-m", opts.model);
     return { command: "gemini", args };

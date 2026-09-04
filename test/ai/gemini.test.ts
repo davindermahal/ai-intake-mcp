@@ -26,7 +26,7 @@ afterEach(() => {
 });
 
 describe("launchGemini", () => {
-  it("spawns `gemini -p <prompt> --skip-trust --include-directories <stateRoot>` detached in the worktree, with no --settings-equivalent flag", () => {
+  it("spawns `gemini -p <prompt> --skip-trust --include-directories <stateRoot> --approval-mode yolo` detached in the worktree, with no --settings-equivalent flag", () => {
     const result = launchGemini({
       projectName: "my-app",
       ticketKey: "DAV-6",
@@ -45,9 +45,16 @@ describe("launchGemini", () => {
     // --include-directories: gemini-cli's equivalent of Claude's --add-dir, needed for the same
     // reason (confirmed live for Claude during Phase E — headless file access is confined to the
     // worktree by default, and context/progress/result files live under the state tree instead).
+    // --approval-mode yolo: without it, gemini-cli's default interactive-approval mode means it never
+    // even attempts a write/Bash tool call with no one present to confirm — it just describes what
+    // it would have done instead (confirmed live). The narrower `auto_edit` mode was tried and
+    // rejected: it still refuses all shell/Bash tool calls outright, which this project's headless
+    // prompts require (git add/commit, make test/build). Safe because the actual safety net is the
+    // separately-synced TOML deny-list policy (src/ai/gemini-policy.ts), which --approval-mode never
+    // overrides.
     expect(spawnMock).toHaveBeenCalledWith(
       "gemini",
-      ["-p", "Author or refine the plan.", "--skip-trust", "--include-directories", dir],
+      ["-p", "Author or refine the plan.", "--skip-trust", "--include-directories", dir, "--approval-mode", "yolo"],
       expect.objectContaining({ cwd: join(dir, "worktree"), detached: true }),
     );
     expect(result.pid).toBe(9999);
@@ -92,7 +99,17 @@ describe("launchGemini", () => {
 
     expect(spawnMock).toHaveBeenCalledWith(
       "gemini",
-      ["-p", "Author or refine the plan.", "--skip-trust", "--include-directories", dir, "-m", "gemini-2.5-pro"],
+      [
+        "-p",
+        "Author or refine the plan.",
+        "--skip-trust",
+        "--include-directories",
+        dir,
+        "--approval-mode",
+        "yolo",
+        "-m",
+        "gemini-2.5-pro",
+      ],
       expect.anything(),
     );
   });

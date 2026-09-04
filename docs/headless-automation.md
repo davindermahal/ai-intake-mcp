@@ -150,6 +150,29 @@ crontab -e
 */2 * * * * /path/to/ai-intake-mcp/scripts/automation-poll.sh
 ```
 
+**`claude`/`gemini` PATH resolution is automatic — no manual crontab setup needed.** cron's own
+`PATH` is minimal (commonly just `/usr/bin:/bin`) and rarely includes wherever these CLIs are
+actually installed; confirmed live during `headless-automation-qa.md`'s Phase I soak test, which is
+exactly how this gap was found. `automation-poll.sh` handles both cases itself:
+
+- `claude` typically lives in `~/.local/bin` (a fixed, safe default to hardcode) — the script adds
+  it, plus `/usr/local/bin`, unconditionally.
+- `gemini` is harder: if you manage Node with nvm/volta/fnm/asdf, `gemini` (and a Node new enough
+  for its own bundled code — v18 fails with `SyntaxError: Invalid regular expression flags`) live
+  *inside* that version manager's own directory tree, which varies per machine and can't be
+  hardcoded. The script auto-detects this instead: if `~/.nvm/versions/node/` exists, it checks
+  every installed version for a working `gemini` and prefers whichever one reports the *newest
+  gemini-cli version* — not simply the newest Node version, since global npm packages are scoped
+  per nvm version and the newest Node isn't necessarily paired with the newest (or even a working)
+  gemini-cli install (confirmed live: on the machine this was found on, the highest Node version's
+  gemini-cli was actually an older, staler install than a lower Node version's). A no-op if nvm
+  isn't installed, or if none of its versions have `gemini`.
+
+If you use a different version manager entirely (volta, fnm, asdf) and don't also have nvm, this
+auto-detection won't find your install — add the equivalent PATH entry to your crontab manually
+(`crontab -e`, a `PATH=` line before your job entries), or extend the same auto-detection block in
+`automation-poll.sh` for your tool.
+
 ## Monitoring and troubleshooting
 
 - **Everything lives under `~/.config/ai-intake-mcp/state/<project-name>/`** — `workers/` (markers),
@@ -175,7 +198,26 @@ crontab -e
 - Only Claude and Gemini adapters exist (decision #14) — no Codex/Antigravity/local-LLM yet.
 - Gemini's permission sandboxing is machine-global, not per-project (`~/.gemini/policies/`) — an
   upstream gemini-cli limitation (issue #18186), not something this project can fix.
+- Gemini runs with `--approval-mode yolo` (auto-approves every tool call) — the actual safety net is
+  the synced deny-list policy above, confirmed live to still block a denied action (`git push`)
+  under `yolo`, independent of approval-mode. The narrower `auto_edit` mode was tried first and
+  rejected: it still refuses all shell/Bash tool calls outright, which this project's own headless
+  prompts require (`git add`/`commit`, `make test`/`build`).
 - A project's `overrides.worktreeRoot` is accepted in the registry schema but not yet wired into
   worktree creation — every project still uses the standard sibling-directory convention.
-- No headless run has been validated against a real board yet — that's exactly what steps 2-3 above
-  are for. Report anything that looks wrong before relying on the cron job unattended.
+- Both providers have been validated against a real board with real processes (planning,
+  implementation, crash/restart/escalate, heartbeats, multi-project isolation, a 24h+ cron soak —
+  see `.ai/plans/active/headless-automation-qa.md`). One open observation from that validation:
+  real Gemini *implementation* cycles (more tool calls per run than planning) were seen to exit
+  silently mid-task with no error a couple of times before completing cleanly on a later attempt —
+  the existing crash/restart watchdog logic handles this correctly (a dead PID with no result file
+  restarts automatically), so it's not unattended-safety-relevant, but the root cause is still
+  unidentified. Investigated and **ruled out**: gemini-cli's own per-session transcripts
+  (`~/.gemini/tmp/<worktree-name>/chats/*.jsonl`) show both failures ending cleanly right after a
+  normal model text response, with no error, crash trace, or tool-call attempt following it — not a
+  process crash. Deliberately rewriting the synced Gemini policy file mid-session (twice, during a
+  real 8-step task) to test whether `automation-poll`'s own `syncGeminiPolicy()` call — which runs
+  every sweep, including sweeps overlapping a still-running worker — was racing with something
+  gemini-cli does on that file was tried and **did not reproduce the issue**; the task completed
+  normally around both rewrites. Most likely a transient gemini-cli/API-level issue outside this
+  project's control, but not confirmed.

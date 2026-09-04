@@ -1,27 +1,40 @@
 # Plan: headless automation — end-to-end QA / validation
 
-**Status**: active — Phases A (partial)/B/C (partial)/D/E/F/G/H exercised, Phase I in progress. Found
-and fixed 10 real bugs so far (8 in A-H, 2 more in the first minutes of Phase I's cron soak —
-`node --import tsx` module resolution and `claude`'s missing PATH entry, both only reachable via a
-real unattended cron invocation, never a manual one):
-the Jira `/rest/api/3/search` → `/rest/api/3/search/jql` removal, Claude's unexpanded-tilde
-permission profile default, Gemini's missing `--skip-trust` flag (0.58.0's trusted-folder gate),
-`syncGeminiPolicy()` never being called from anywhere, headless workers having no `--add-dir` to
-their own state tree, a deny-only Claude permissions file granting nothing (fixed by matching
-`ai-intake-harness`'s proven allow+deny profile), `planHasUnresolvedOpenQuestions` being unable to
-distinguish a genuinely blocking open question from the prompt's own "confirm at review, non-blocking"
-convention (fixed via `.ai/plans/completed/open-questions-blocking-vs-confirm-split.md`'s
-`## Open Questions`/`## Confirm at Review` section split), and the permission profile's `Bash`
-allow-list missing `git mv`, needed for the documented "move plan to `.ai/plans/completed/`" step.
-Phase D (dry-run) passed clean with no new bugs. Phase E (first real planning cycle, including
-re-pickup/refine), Phase F (first real implementation cycle, happy path + negative/blocked case), and
-Phase G (crash/restart/escalate, real heartbeat content, all three permission-sandbox layers
-independently confirmed, flock cron-overlap guard), and Phase H (a second registered project,
-cross-project concurrency-cap independence, `enabled: false` not abandoning an in-flight worker) all
-passed end to end, no new bugs in G or H. Phase I (24h+ cron soak) is now running against both test
-projects; 2 real bugs already found and fixed in its first minutes (see that phase's section).
-Gemini's real "prints OK" case is still unconfirmed (blocked on this account's AI Studio billing, not
-a code issue). Phase J not yet run.
+**Status**: active — Phases A/B/C/D/E/F/G/H fully passed, Phase I in progress (started 2026-09-03
+~12:38pm, needs 24h+). Found and fixed 13 real bugs so far, none of which any unit test could have
+caught:
+
+1. Jira's `/rest/api/3/search` removed in favor of `/rest/api/3/search/jql`.
+2. Claude's unexpanded-tilde permission-profile default (`spawn()` has no shell to expand it).
+3. Gemini's missing `--skip-trust` (0.58.0's trusted-folder gate fires on every fresh worktree).
+4. `syncGeminiPolicy()` fully built and unit-tested but never actually called from anywhere.
+5. Headless workers had no `--add-dir`/`--include-directories` to their own state tree.
+6. Claude's permission profile was deny-only (no `allow` list) — every write silently denied.
+7. `planHasUnresolvedOpenQuestions` couldn't distinguish a blocking question from the prompt's own
+   "confirm at review, non-blocking" convention — fixed via the `## Open Questions`/
+   `## Confirm at Review` section split (`.ai/plans/completed/open-questions-blocking-vs-confirm-split.md`).
+8. The Claude permission profile's `Bash` allow-list had no `git mv`, needed for the documented
+   "move plan to `.ai/plans/completed/`" step.
+9. `node --import tsx` resolves `tsx` relative to cwd, not the script's location — crashed every
+   real cron tick (cron's cwd is `$HOME`), invisible to any manual test run from inside the project.
+10. cron's own PATH doesn't include wherever `claude` is installed (`~/.local/bin`).
+11. cron's PATH also doesn't include wherever a Node-version-manager keeps `gemini` — fixed by
+    auto-detecting the nvm-managed version with the newest *working `gemini-cli`* (not the newest
+    Node version — those aren't the same thing; global npm packages are scoped per nvm version).
+12. Gemini never got an approval-mode flag, so real writes/Bash silently never happened (it just
+    described what it would have done) — fixed with `--approval-mode yolo`, its deny-list policy
+    engine confirmed to still block a real `git push` independent of that flag.
+13. (Phase G3) The Claude permission profile's `Bash` allow-list gaps found while testing the
+    permission sandbox live are already covered by #6/#8 above.
+
+Phase D (dry-run) passed clean with no new bugs. Phase E (real planning + re-pickup/refine), Phase F
+(real implementation, happy path + blocked path), Phase G (crash/restart/escalate, real heartbeat
+content, all three permission-sandbox layers independently confirmed, flock cron-overlap guard), and
+Phase H (a second registered project, cross-project concurrency-cap independence, `enabled: false`
+not abandoning an in-flight worker) all passed end to end for **both providers** — Gemini's full
+real workflow (planning cycle, implementation cycle, permission sandbox) is now confirmed working
+end to end alongside Claude's, once the above were fixed. Phase I (24h+ cron soak) is running
+against both test projects. Phase J not yet run.
 **Created**: 2026-09-03
 
 **Related**: `.ai/plans/active/headless-automation.md` (the implementation this validates — all 22
@@ -78,7 +91,7 @@ injection in particular involves killing real processes and should be watched li
 - [ ] `npm run health-check` passes (confirms `~/.config/ai-intake-mcp/.env` credentials are good).
 - [ ] `npm run build` succeeds and `npm test` is fully green on the branch you're validating.
 
-## Phase A — Environment & version recording
+## Phase A — Environment & version recording — PASSED 2026-09-03
 
 **Objective**: capture exactly what you tested against, so a later regression can be traced to a
 version drift rather than re-discovered from scratch.
@@ -91,6 +104,13 @@ version drift rather than re-discovered from scratch.
    down; every later phase refers back to "the test project"/"the test repo" using these.
 
 **Pass criteria**: all versions recorded; `health-check` and `npm test` both green.
+
+**Recorded versions**: `claude` 2.1.259 (Claude Code); `gemini` 0.58.0 (the one actually used — see
+Phase B/Gemini's section for why a *different* installed version, 0.56.0, was the wrong one to pick
+and had to be actively avoided); `node` v24.19.0. Test project: DAV board, two registered repos —
+`qa-headless-test-repo` (`app:qa-headless-test`) and `qa-headless-test-repo-2`
+(`app:qa-headless-test-2`). `npm run health-check`: passed (authenticated, native "In Progress"
+status confirmed). `npm test`: 326 passed, 3 skipped, 0 failed.
 
 ## Phase B — Provider CLI smoke test, outside the orchestrator entirely
 
@@ -118,8 +138,66 @@ drift before you've burned a real planning/implementation run debugging it.
   adding `--skip-trust` to `launchGemini`'s args (the flag gemini's own docs name for exactly this:
   headless/automated environments). Confirmed live: with the flag, the CLI got past the trust gate
   and reached the real Gemini API — at which point it hit `429 RESOURCE_EXHAUSTED: Your prepayment
-  credits are depleted`, an account-billing issue on api.google.dev, not a code bug. **Gemini's
-  "prints OK" success case is still unconfirmed** — re-run step 3 below once billing is resolved.
+  credits are depleted`, an account-billing issue on api.google.dev, not a code bug.
+
+  **Update 2026-09-03, billing resolved — Gemini fully confirmed working, 2 more real bugs found and
+  fixed:** `gemini -p ... --skip-trust` now prints `OK`, exit 0 (this step passes). But a full real
+  headless cycle (via `automation-poll`, not just the bare CLI) surfaced two more gaps:
+  - **cron's PATH doesn't include wherever a Node-version-manager keeps `gemini`.** Same root cause
+    as Phase I's `claude` PATH bug, but harder: `gemini` lives *inside* nvm/volta/fnm/asdf's own
+    directory tree, which varies per machine and can't be hardcoded. Automated instead of documented
+    (per explicit preference for automation over a README workaround): `automation-poll.sh` now
+    scans every installed nvm Node version (when nvm is present) and prefers whichever one has the
+    *newest working `gemini-cli`* — not the newest Node version, which turned out to be the wrong
+    heuristic: on this machine, the highest Node version's `gemini-cli` was an older, staler install
+    (0.56.0) than a lower Node version's (0.58.0), since global npm packages are scoped per nvm
+    version. A no-op wherever nvm isn't installed.
+  - **Real writes/Bash never happened at all.** With only `--include-directories`, gemini-cli's
+    default `approval-mode` still requires interactive confirmation for any write/shell tool call —
+    identical in spirit to Claude's Phase E deny-only-profile bug — so with nobody present to
+    confirm, the worker never even attempted a write; it just *described* what it would have written
+    in its response text. Fixed with `--approval-mode yolo`. The narrower `auto_edit` mode was tried
+    first and rejected: it auto-approves file edits but still refuses all shell/Bash tool calls
+    outright ("a shell command execution tool is not available"), which this project's headless
+    prompts require (`git add`/`commit`, `make test`/`build`). Safe for the same reason as Claude's
+    broad-allow-plus-deny-list: the actual safety net is the separately-synced TOML policy
+    (`src/ai/gemini-policy.ts`), confirmed live to still block a real `git push` attempt with the
+    exact message `"Tool execution denied by policy."`, independent of `--approval-mode` (see the
+    permission-sandbox confirmation below).
+
+  With both fixes, a full real Gemini planning cycle (`ai-plan-<profile>` label) ran end to end:
+  real progress-log entries, a real committed plan file, a real result file, watchdog completion,
+  `state:review`. A full real Gemini implementation cycle (`ai-impl-<profile>` label) also
+  confirmed the permission-sandbox layer specifically: crafted a plan step tempting `git push`
+  (mirroring Phase G3's Claude test) — the run took 3 real attempts before completing (the first two
+  exited silently mid-task with no error message, which the crash-watchdog's existing restart logic
+  handled correctly) — the third attempt reached the push step, was denied by the policy engine as
+  above, reported `"blocked"`, and correctly transitioned to `state:problem`. No commit ever reached
+  a remote in any attempt.
+
+  **Investigated the two silent mid-task exits separately (2026-09-03) — root cause not confirmed,
+  but two plausible causes ruled out with real evidence:**
+  - Not a process crash: gemini-cli keeps its own per-session transcript
+    (`~/.gemini/tmp/<worktree-name>/chats/*.jsonl`, one file per attempt). Both failed sessions'
+    transcripts end cleanly right after a normal model text response describing the next step — no
+    error, no crash trace, no tool-call attempt ever follows. Turn counts were 19 and 23 respectively
+    vs. 39 for a successful run in the same worktree — consistent with the session simply stopping,
+    not erroring.
+  - Considered, then **directly disproven**: `automation-poll`'s `syncGeminiPolicy()` call runs on
+    *every* sweep (Phase G's fix), including sweeps that land while a Gemini worker from an earlier
+    dispatch is still running — the two failures both happened to die a few dozen seconds after a
+    real cron tick fired during their run, while the one success that session crossed a cron-tick
+    boundary without dying, which was suggestive enough to test directly: dispatched a fresh, real
+    8-step Gemini implementation task (`DAV-24`, sized to run several minutes) and deliberately
+    called `syncGeminiPolicy()` twice mid-session, once after the first progress-log entry and again
+    a few steps later, to simulate exactly what a concurrent cron tick does. The task completed all 8
+    steps and both `make test`/`make build` cleanly around both rewrites — this rules out the policy
+    file rewrite as the cause.
+  - Most likely explanation given the above: a transient gemini-cli-side or Gemini-API-side issue
+    unrelated to this project's own code — not confirmed, and not investigated further, since the
+    existing crash/restart watchdog already handles it correctly regardless of cause (every real
+    occurrence today, across DAV-23 and earlier, resolved via automatic or manual restart). Noted in
+    `docs/headless-automation.md`'s limitations for anyone who hits it again.
 - **The permission profile example below (a deny-only `{"permissions": {"deny": [...]}}`) is
   insufficient for real work, only good enough to pass this phase's own flag-smoke-test** — found
   the hard way during Phase E, not here, because Phase B's own check never exercises a real write.
@@ -185,9 +263,23 @@ Claude: cleared. Gemini: flag-level fix confirmed, but re-run step 3 for real on
 don't run a real (billed) Gemini planning/implementation cycle in Phase E/F until you've actually
 seen it succeed here first.
 
-## Phase C — Registration wizard
+## Phase C — Registration wizard — PASSED 2026-09-03
 
 **Objective**: validate decision #20's collision check and the wizard flow against the real board.
+
+**Steps 1-2 confirmed** via registering `qa-headless-test-repo` and `qa-headless-test-repo-2` fresh
+(Phase H) — both wrote clean single entries, no duplicates on re-registration.
+
+**Step 3 (refusal path), confirmed live**: rather than hand-editing the registry file with a
+fabricated entry, used the real registry state this QA effort had already built up — a third
+throwaway repo (`qa-headless-test-repo-3`) was created with `.ai/intake-mcp.json` deliberately
+reusing `app:qa-headless-test`, the tag `qa-headless-test-repo` already legitimately owns in the
+registry, with real Jira tickets (`DAV-6` and others) already carrying that tag. Ran the wizard
+against the new path: refused immediately with `"app:qa-headless-test" is already claimed by a
+different registered project at ".../qa-headless-test-repo"` — the exact message the pass criterion
+names. `~/.config/ai-intake-mcp/projects.json` confirmed byte-for-byte unchanged before/after. The
+throwaway repo was deleted afterward (nothing to "remove" from the registry — nothing was ever
+written).
 
 **Already found and fixed by this phase (2026-09-03)**: the first live run hit
 `Jira API error 410 Gone` on the collision check — Atlassian removed `/rest/api/3/search` in favor of
