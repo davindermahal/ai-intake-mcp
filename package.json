@@ -1,6 +1,6 @@
 {
   "name": "@davindermahal/ai-intake-mcp",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "On-demand ticket planning via MCP, no cron / no per-project install.",
   "license": "MIT",
   "author": "Davinder S. Mahal",
