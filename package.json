@@ -16,7 +16,9 @@
     "test": "vitest run",
     "lint": "eslint src test scripts",
     "health-check": "node --import tsx scripts/health-check.ts",
-    "smoke:jira": "node --import tsx scripts/jira-smoke-check.ts"
+    "smoke:jira": "node --import tsx scripts/jira-smoke-check.ts",
+    "register-project": "node --import tsx scripts/register-project.ts",
+    "automation-poll": "node --import tsx scripts/automation-poll.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.19.0",

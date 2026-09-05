@@ -132,8 +132,13 @@ Commit your work on the branch as you complete logical units (`git add`/`git com
 
 **Success** (plan fully implemented, moved to `completed/`, every declared `make` target and the
 plan's own acceptance checks passed):
-1. `tracker_add_comment(key, "Implementation complete on branch <branch> (local — not pushed).\n\nWhat changed: <2-5 bullet summary>.\nVerify: <which make targets ran and passed>.\n\nReady for your review: check out the branch, review the diff, and merge when satisfied. Nothing was pushed, merged, or deployed.")`
+1. `tracker_add_comment(key, "Implementation complete on branch <branch> (local — not pushed).\n\nWhat changed: <2-5 bullet summary>.\nVerify: <which make targets ran and passed>.\n\nReady for your review: check out the branch, review the diff, and merge when satisfied. Nothing was pushed, merged, or deployed.\n\nManual QA still needed: <the plan's ## QA Plan section, verbatim or summarized — 'None' if the plan said so>.")`
 2. `tracker_transition(key, "verify")`
+
+Passing `make test`/the plan's acceptance checks proves the code's logic; it does not discharge the
+plan's `## QA Plan` — that's the reviewer's job, using the manual steps the plan already wrote out
+for exactly this moment. Naming it in the completion comment (even just "None," when the plan said
+so) is what stops it from being silently forgotten once the ticket moves to `state:verify`.
 
 **Blocked** (plan not implementable as written, a declared `make` target failed and you couldn't fix
 it, or you hit something needing a human decision):

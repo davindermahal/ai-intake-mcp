@@ -2,7 +2,9 @@
 
 One-time, per-developer setup. Nothing here is per-project — you do this once regardless of how many
 repos you plan a ticket in. For the day-to-day workflow once this is done, see
-[`usage.md`](usage.md).
+[`usage.md`](usage.md). Once you also want unattended, on-a-cron automation across registered repos
+instead of (or alongside) driving this interactively, see
+[`headless-automation.md`](headless-automation.md) — a separate, newer, not-yet-live-validated mode.
 
 ## The fast path
 

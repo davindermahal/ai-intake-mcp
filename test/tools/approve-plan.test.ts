@@ -30,6 +30,12 @@ function git(args: string[], cwd: string): string {
   return execFileSync("git", args, { cwd, encoding: "utf8" }).trim();
 }
 
+const PLAN_HEADER =
+  "# Plan: DAV-5 Fix the thing\n\n**Status**: draft\n**Branch**: feature/DAV-5-fix-the-thing\n**Created**: 2026-01-01\n**Updated**: 2026-01-01\n";
+const COMPLETE_SECTIONS =
+  "\n## Implementation order\n\n1. Fix the thing.\n\n## Testing strategy\n\nRun `npm test`.\n\n" +
+  "## QA Plan\n\nNone — automated coverage above is sufficient.\n";
+
 let parentDir: string;
 let repoRoot: string;
 let worktreePath: string;
@@ -49,11 +55,7 @@ beforeEach(async () => {
   const activeDir = join(worktreePath, ".ai", "plans", "active");
   mkdirSync(activeDir, { recursive: true });
   planPath = join(activeDir, "DAV-5-fix-the-thing.md");
-  writeFileSync(
-    planPath,
-    "# Plan: DAV-5 Fix the thing\n\n**Status**: draft\n**Branch**: feature/DAV-5-fix-the-thing\n**Created**: 2026-01-01\n**Updated**: 2026-01-01\n",
-    "utf8",
-  );
+  writeFileSync(planPath, PLAN_HEADER + COMPLETE_SECTIONS, "utf8");
 });
 
 afterEach(() => {
@@ -123,11 +125,7 @@ describe("approvePlanTool", () => {
   });
 
   it("refuses when the plan file isn't draft", async () => {
-    writeFileSync(
-      planPath,
-      "# Plan: DAV-5 Fix the thing\n\n**Status**: ready\n**Branch**: feature/DAV-5-fix-the-thing\n**Created**: 2026-01-01\n**Updated**: 2026-01-01\n",
-      "utf8",
-    );
+    writeFileSync(planPath, PLAN_HEADER.replace("**Status**: draft", "**Status**: ready") + COMPLETE_SECTIONS, "utf8");
     const fetchImpl = vi.fn();
     await expect(approvePlanTool(makeClient(fetchImpl), config, "DAV-5", repoRoot)).rejects.toThrow(
       /not "draft"/,
@@ -138,7 +136,7 @@ describe("approvePlanTool", () => {
   it("refuses when the plan has an unresolved Open Questions item", async () => {
     writeFileSync(
       planPath,
-      "# Plan: DAV-5 Fix the thing\n\n**Status**: draft\n**Branch**: feature/DAV-5-fix-the-thing\n**Created**: 2026-01-01\n**Updated**: 2026-01-01\n\n## Open Questions\n\n- [ ] Still open.\n",
+      `${PLAN_HEADER}\n## Open Questions\n\n- [ ] Still open.\n${COMPLETE_SECTIONS}`,
       "utf8",
     );
     const fetchImpl = vi.fn();
@@ -148,10 +146,60 @@ describe("approvePlanTool", () => {
     expect(fetchImpl).not.toHaveBeenCalled();
   });
 
+  // Regression guard (headless-automation-qa.md's open-questions-blocking-vs-confirm-split plan):
+  // watchdog-pass.ts now routes on "## Open Questions" alone (a "## Confirm at Review" note must
+  // never look blocking there), but approve_plan's own gate must NOT weaken to match — a human
+  // still can't approve past an unresolved "## Confirm at Review" item any more than an Open
+  // Questions one.
+  it("refuses when only Confirm at Review has an unresolved item, even with Open Questions fully resolved", async () => {
+    writeFileSync(
+      planPath,
+      `${PLAN_HEADER}\n## Open Questions\n\n- [x] Resolved.\n\n## Confirm at Review\n\n` +
+        `- [ ] Recommend as-is.\n${COMPLETE_SECTIONS}`,
+      "utf8",
+    );
+    const fetchImpl = vi.fn();
+    await expect(approvePlanTool(makeClient(fetchImpl), config, "DAV-5", repoRoot)).rejects.toThrow(
+      /unresolved "- \[ \]" items/,
+    );
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it("refuses when the plan has no Implementation order section", async () => {
+    writeFileSync(planPath, `${PLAN_HEADER}\n## Testing strategy\n\nRun \`npm test\`.\n`, "utf8");
+    const fetchImpl = vi.fn();
+    await expect(approvePlanTool(makeClient(fetchImpl), config, "DAV-5", repoRoot)).rejects.toThrow(
+      /no "## Implementation order" section/,
+    );
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it("refuses when the plan has no Testing strategy section", async () => {
+    writeFileSync(planPath, `${PLAN_HEADER}\n## Implementation order\n\n1. Fix the thing.\n`, "utf8");
+    const fetchImpl = vi.fn();
+    await expect(approvePlanTool(makeClient(fetchImpl), config, "DAV-5", repoRoot)).rejects.toThrow(
+      /no "## Testing strategy" section/,
+    );
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it("refuses when the plan has no QA Plan section", async () => {
+    writeFileSync(
+      planPath,
+      `${PLAN_HEADER}\n## Implementation order\n\n1. Fix the thing.\n\n## Testing strategy\n\nRun \`npm test\`.\n`,
+      "utf8",
+    );
+    const fetchImpl = vi.fn();
+    await expect(approvePlanTool(makeClient(fetchImpl), config, "DAV-5", repoRoot)).rejects.toThrow(
+      /no "## QA Plan" section/,
+    );
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
   it("approves once every Open Questions item is checked off", async () => {
     writeFileSync(
       planPath,
-      "# Plan: DAV-5 Fix the thing\n\n**Status**: draft\n**Branch**: feature/DAV-5-fix-the-thing\n**Created**: 2026-01-01\n**Updated**: 2026-01-01\n\n## Open Questions\n\n- [x] Resolved.\n",
+      `${PLAN_HEADER}\n## Open Questions\n\n- [x] Resolved.\n${COMPLETE_SECTIONS}`,
       "utf8",
     );
     const fetchImpl = vi.fn(async (input: RequestInfo | URL) => {

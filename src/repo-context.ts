@@ -12,7 +12,7 @@ export function resolveRepoRoot(cwd: string = process.cwd()): string {
 }
 
 export interface RepoConfig {
-  jiraProjectKey: string;
+  jiraProjectKeys: string[];
   appTag: string;
   /** Which of the fixed `install`/`build`/`test`/`lint` targets this project's Makefile genuinely
    * doesn't define — an explicit declaration, not a silent inference (hardening-phase plan, decision
@@ -25,34 +25,54 @@ function configPath(repoRoot: string): string {
   return join(repoRoot, ".ai", "intake-mcp.json");
 }
 
-/** Per-repo config file (decision #4): committed, auto-bootstrapped, no separate setup command. */
+/**
+ * Per-repo config file (decision #4): committed, auto-bootstrapped, no separate setup command.
+ * `jiraProjectKeys` (decision #6, headless-automation plan) is the current field — a list, so one
+ * repo can be scoped to several Jira project keys. The legacy singular `jiraProjectKey` string is
+ * still accepted and normalized to a one-element list, so already-committed `.ai/intake-mcp.json`
+ * files from before this migration keep working without edits.
+ */
 export function readRepoConfig(repoRoot: string): RepoConfig | undefined {
   const path = configPath(repoRoot);
   if (!existsSync(path)) return undefined;
 
   const parsed: unknown = JSON.parse(readFileSync(path, "utf8"));
-  const jiraProjectKey =
-    typeof parsed === "object" && parsed !== null && "jiraProjectKey" in parsed
-      ? (parsed as { jiraProjectKey: unknown }).jiraProjectKey
-      : undefined;
-  const appTag =
-    typeof parsed === "object" && parsed !== null && "appTag" in parsed
-      ? (parsed as { appTag: unknown }).appTag
-      : undefined;
-  if (typeof jiraProjectKey !== "string" || typeof appTag !== "string") {
-    throw new Error(`${path} is malformed — expected { "jiraProjectKey": string, "appTag": string }.`);
-  }
-  const rawSkipTargets =
-    typeof parsed === "object" && parsed !== null && "skipTargets" in parsed
-      ? (parsed as { skipTargets: unknown }).skipTargets
-      : undefined;
-  if (rawSkipTargets !== undefined) {
-    if (!Array.isArray(rawSkipTargets) || !rawSkipTargets.every((t) => typeof t === "string")) {
-      throw new Error(`${path} is malformed — "skipTargets" must be an array of strings.`);
+  const obj = typeof parsed === "object" && parsed !== null ? (parsed as Record<string, unknown>) : {};
+  const malformed = (detail: string): Error =>
+    new Error(
+      `${path} is malformed — ${detail}. Expected { "jiraProjectKeys": string[], "appTag": string } ` +
+        `(or the legacy { "jiraProjectKey": string, "appTag": string }).`,
+    );
+
+  let jiraProjectKeys: string[];
+  if ("jiraProjectKeys" in obj) {
+    const raw = obj.jiraProjectKeys;
+    if (!Array.isArray(raw) || raw.length === 0 || !raw.every((k) => typeof k === "string")) {
+      throw malformed('"jiraProjectKeys" must be a non-empty array of strings');
     }
-    return { jiraProjectKey, appTag, skipTargets: rawSkipTargets };
+    jiraProjectKeys = raw as string[];
+  } else if ("jiraProjectKey" in obj) {
+    if (typeof obj.jiraProjectKey !== "string") {
+      throw malformed('"jiraProjectKey" must be a string');
+    }
+    jiraProjectKeys = [obj.jiraProjectKey];
+  } else {
+    throw malformed('missing both "jiraProjectKeys" and "jiraProjectKey"');
   }
-  return { jiraProjectKey, appTag };
+
+  if (typeof obj.appTag !== "string") {
+    throw malformed('"appTag" must be a string');
+  }
+  const appTag = obj.appTag;
+
+  if (obj.skipTargets !== undefined) {
+    const rawSkipTargets = obj.skipTargets;
+    if (!Array.isArray(rawSkipTargets) || !rawSkipTargets.every((t) => typeof t === "string")) {
+      throw malformed('"skipTargets" must be an array of strings');
+    }
+    return { jiraProjectKeys, appTag, skipTargets: rawSkipTargets as string[] };
+  }
+  return { jiraProjectKeys, appTag };
 }
 
 export function writeRepoConfig(repoRoot: string, config: RepoConfig): string {

@@ -46,8 +46,9 @@ ls .ai/plans/active/<TICKET-KEY>-*.md
 ```
 
 Then: **Goal**, **Scope** (in/out), **Files to change** (one-line reason each), **Key decisions**,
-**Implementation order**, **Testing strategy**, **Boundaries**, **Open Questions**. Leave
-`**Status**: draft` — flipping to `ready` happens via the `approve_plan` tool, a separate human
+**Implementation order**, **Testing strategy**, **QA Plan**, **Boundaries**, **Open Questions**,
+**Confirm at Review**. Leave `**Status**: draft` — flipping to `ready` happens via the `approve_plan`
+tool, a separate human
 decision this planning session never makes itself.
 
 ### Write for a weaker executor
@@ -109,25 +110,68 @@ relies on), and, for each Implementation order group, a one-line note on what's 
 (pass path + fail/error path). This is required on every plan, same standing as `## Boundaries` — not
 optional, not something to add only when asked.
 
-### `## Open Questions` format — required, checked by `approve_plan`
+### `## QA Plan` — required: automated coverage vs. what a human must verify
 
-Every item, blocking or not, is a GitHub-style task-list line: `- [ ]` while unresolved, `- [x]`
-once resolved. `approve_plan` parses this and **refuses to approve while any `- [ ]` item remains**
-— including a non-blocking "confirm at review" note (§3). That's the point: it forces whoever
-reviews the plan to actually engage with each open item (edit the plan to check it off, accepting the
-noted default, rather than approving with something silently unaddressed). Resolving an item means
-flipping `[ ]` → `[x]` in place — never delete the line; it's the plan's own record of what was
-raised and how it was settled, the same audit-trail habit this project's own dogfooding plans already
-keep as a separate "Resolved" section.
+`## Testing strategy` above proves the code's *logic* is correct against whatever the automated
+suite can observe — mocked APIs, fake dependencies, in-process assertions. It cannot prove the
+change actually works against anything the suite doesn't (or can't) exercise for real: a real
+external API/service, real timing, a real UI a human has to look at, a new unattended/scheduled
+process, real credentials, real file/process interaction. Every plan states, explicitly, both halves
+— what's already covered by `## Testing strategy`, and, separately, exactly what still needs a human
+to manually verify and how.
+
+Write each manual-verification item as a literal, checkable step — the same "write for a weaker
+executor" standard as `## Implementation order`: exact commands, exact URLs/UI paths a person clicks
+through, exact pass/fail criteria — never "verify it works" or "test thoroughly." Whoever executes
+this section may not be you, and may not even be technical beyond following exact steps.
+
+A plan whose manual-QA surface is genuinely large (multiple real-system integrations, a new
+unattended/scheduled process, anything a soak test would meaningfully validate, several distinct
+failure modes worth deliberately injecting) should split it into a companion QA plan file
+(`.ai/plans/active/<slug>-qa.md`, cross-linked from both directions — name it here, in this section,
+and add this plan to the QA plan's own "Related") rather than bloating this section past readability.
+`.ai/plans/active/headless-automation-qa.md` is the reference example of that shape: phased, each
+phase with an objective, literal steps, and explicit pass/fail criteria, ending in a sign-off
+checklist.
+
+If a change genuinely has no manual-QA surface at all (a pure internal refactor, nothing outside the
+existing automated suite's reach), say so outright — `"None — automated coverage above is
+sufficient, no real external system is touched by this change"` — rather than leaving the section
+thin or silently absent. Same standard as `## Boundaries`'s "none — full repo in scope": an explicit,
+deliberate "none" is fine; a thin or missing section is not, and is treated as a planning defect the
+same way a missing `## Boundaries` is.
+
+### `## Open Questions` and `## Confirm at Review` format — required, both checked by `approve_plan`
+
+Two separate sections, both GitHub-style task-list lines (`- [ ]` while unresolved, `- [x]` once
+resolved), split by whether the pipeline can proceed without a human answer:
+
+- **`## Open Questions`** — genuinely blocking: an ambiguity only the ticket's author can resolve,
+  not something you can settle from the codebase or a sensible default. Drives the `state:needs-input`
+  branch of §5 below (and, for a headless run, the orchestrator's own routing — same distinction,
+  same section, different mechanism reading it).
+- **`## Confirm at Review`** — non-blocking: you've already settled it (from the codebase or a safe
+  default) and just want a reviewer's nod, not new information. Never sends a plan to
+  `state:needs-input` — it goes to `state:review` in §5's "no blocking questions" branch, same as a
+  plan with no open items at all. State your recommended choice in the item itself.
+
+`approve_plan` parses **both** sections and **refuses to approve while any `- [ ]` item remains in
+either one** — a "confirm at review" note doesn't get a pass just because it was never blocking.
+That's the point: it forces whoever reviews the plan to actually engage with every item (edit the
+plan to check it off, accepting the noted default, rather than approving with something silently
+unaddressed). Resolving an item means flipping `[ ]` → `[x]` in place — never delete the line; it's
+the plan's own record of what was raised and how it was settled, the same audit-trail habit this
+project's own dogfooding plans already keep as a separate "Resolved" section. If a plan truly has
+nothing for one of the sections, write `None` under its heading rather than omitting the heading.
 
 ## 3. Decide: questions vs. clean
 
-Judge whether **Open Questions** contains anything that genuinely blocks a confident plan — an
-ambiguity only the ticket's author can resolve, not something you can settle from the codebase or a
-sensible default.
+Judge whether anything genuinely blocks a confident plan — an ambiguity only the ticket's author can
+resolve, not something you can settle from the codebase or a sensible default.
 
-**Structural decisions always block, even when a sensible default exists.** Route to `state:review`
-never happens here — these go to `state:needs-input` regardless of how reasonable a default seems:
+**Structural decisions always block, even when a sensible default exists — these go under
+`## Open Questions`, never `## Confirm at Review`.** Route to `state:review` never happens here —
+these go to `state:needs-input` regardless of how reasonable a default seems:
 
 - **Schema/data-model changes** to existing tables — adding/removing/renaming a column, changing a
   primary key, altering types/constraints, any migration that rewrites or backfills existing rows.
@@ -137,9 +181,10 @@ never happens here — these go to `state:needs-input` regardless of how reasona
   API/response shape.
 
 State your recommended option in the question so the author can confirm with a one-word reply,
-written as `- [ ]` (see above). Non-structural ambiguities you can settle from the codebase or a safe
-default stay `clean` (note them under Open Questions as `- [ ]` "confirm at review" instead of
-blocking on them — the reviewer checks them off, or reopens one, before calling `approve_plan`).
+written as `- [ ]` under `## Open Questions`. Non-structural ambiguities you can settle from the
+codebase or a safe default go under `## Confirm at Review` instead, written the same way (`- [ ]`,
+with your recommendation stated) — the reviewer checks them off, or reopens one, before calling
+`approve_plan`. Never mix the two under one heading.
 
 ## 4. Commit the plan file
 

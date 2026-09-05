@@ -49,6 +49,15 @@ real-system surprise is to isolate. See
 `.ai/plans/active/ai-intake-mcp-on-demand-planning.md`'s "Verification checkpoints" section for the
 pattern.
 
+This is now also a structural requirement of the plan format itself, not just a principle to
+remember: every plan — whether authored interactively or by a headless worker — requires a non-empty
+`## QA Plan` section (`docs/planning-procedure.md`, enforced by `planHasQAPlanSection`/
+`approve_plan`, same standing as `## Boundaries`/`## Testing strategy`) stating what's covered by
+automated tests and, separately, exactly what a human must still manually verify — "None" when
+genuinely nothing needs it. A plan whose manual-QA surface is large enough to warrant its own
+document splits it into a companion `.ai/plans/active/<slug>-qa.md`; see
+`.ai/plans/active/headless-automation-qa.md` for the shape one of those takes.
+
 ## `.ai/docs/extracted/`
 
 A generic drop point for scoped writeups extracted from this project for use outside it (e.g. for

@@ -25,9 +25,10 @@ export async function trackerGetIssue(
   }
 
   const issue = await fetchIssue(client, key);
-  if (issue.projectKey !== repoConfig.jiraProjectKey) {
+  if (!repoConfig.jiraProjectKeys.includes(issue.projectKey)) {
     throw new Error(
-      `${key} belongs to Jira project "${issue.projectKey}", not "${repoConfig.jiraProjectKey}" — wrong repo?`,
+      `${key} belongs to Jira project "${issue.projectKey}", not one of ` +
+        `[${repoConfig.jiraProjectKeys.join(", ")}] — wrong repo?`,
     );
   }
 
