@@ -1,8 +1,9 @@
 # Plan: headless automation — end-to-end QA / validation
 
-**Status**: active — Phases A/B/C/D/E/F/G/H fully passed, Phase I in progress (started 2026-09-03
-~12:38pm, needs 24h+). Found and fixed 13 real bugs so far, none of which any unit test could have
-caught:
+**Status**: complete — Phases A/B/C/D/E/F/G/H/I fully passed (Phase I: 24.5h soak, 2026-09-03 ~12:38pm
+through 2026-09-04 ~1:07pm, 0 issues beyond the 2 bugs it found in its first 4 minutes). Phase J
+(sign-off): **GO**, 2026-09-04. Found and fixed 13 real bugs along the way, none of which any unit
+test could have caught:
 
 1. Jira's `/rest/api/3/search` removed in favor of `/rest/api/3/search/jql`.
 2. Claude's unexpanded-tilde permission-profile default (`spawn()` has no shell to expand it).
@@ -33,8 +34,8 @@ content, all three permission-sandbox layers independently confirmed, flock cron
 Phase H (a second registered project, cross-project concurrency-cap independence, `enabled: false`
 not abandoning an in-flight worker) all passed end to end for **both providers** — Gemini's full
 real workflow (planning cycle, implementation cycle, permission sandbox) is now confirmed working
-end to end alongside Claude's, once the above were fixed. Phase I (24h+ cron soak) is running
-against both test projects. Phase J not yet run.
+end to end alongside Claude's, once the above were fixed. Phase I (24.5h cron soak against both test
+projects) passed with 0 further bugs. Phase J (sign-off): **GO**.
 **Created**: 2026-09-03
 
 **Related**: `.ai/plans/active/headless-automation.md` (the implementation this validates — all 22
@@ -666,7 +667,7 @@ Cleaned up afterward: both projects' `overrides` removed and `enabled` restored 
    processes its existing in-flight worker to completion (Review Finding #8) — confirm via the
    marker disappearing and a completion comment posting despite `enabled: false`.
 
-## Phase I — Cron soak test — IN PROGRESS, started 2026-09-03 (2 real bugs found and fixed within minutes)
+## Phase I — Cron soak test — PASSED 2026-09-04 (24.5h soak, 2 real bugs found and fixed within minutes, 0 further issues)
 
 **Objective**: sustained, low-attention operation — the actual target end state — over a period long
 enough to surface anything that only shows up after many ticks (state leaks, unbounded log growth,
@@ -711,13 +712,39 @@ invocation:**
   unattended cron mechanism itself recovered and worked correctly once the underlying script was
   fixed, which is exactly the property this phase is meant to validate.
 
-**Soak continues from here — checking in periodically, not continuously, per this phase's own
-instruction.** Remaining to verify over the following 24h+: `DAV-19` sits correctly in
-`state:needs-input` the whole time without being falsely picked up; `DAV-20` gets a reply partway
-through and correctly re-picks-up on the next tick afterward; no duplicate dispatches on any ticket;
-no marker/lock-file leak in `~/.config/ai-intake-mcp/state/`; the soak log shows no further crashes
-from the poll script itself. Results to be appended here once the 24h+ window completes and the cron
-entry is removed.
+**Result: full pass, no bugs found beyond the 2 already fixed in the first 4 minutes above.** Ran
+24.5h (2026-09-03 ~12:38pm through 2026-09-04 ~1:07pm), checked in periodically rather than
+continuously, per this phase's own instruction.
+
+- **No further crashes**: across the full ~3,950-line soak log, the only non-clean lines are the two
+  startup-crash tracebacks already covered above and one recurring, harmless
+  `fatal: ref refs/remotes/origin/HEAD is not a symbolic ref` (git's own stderr from preparing a fresh
+  worktree with no `origin/HEAD` set — appears twice, both times immediately followed by a successful
+  `Preparing worktree` and dispatch; never blocks anything).
+- **Exactly 4 real dispatches in 24.5h, none duplicated**: `DAV-18` (planning, ~12:42pm day 1),
+  `DAV-21` (implementation, ~12:40–44pm day 1), `DAV-22` (planning, ~1:37–45pm day 1 — a
+  previously-seeded Gemini-planning fixture from earlier work that simply happened to still be
+  sitting in `state:plan`, picked up correctly like any ordinary ticket), and `DAV-20` (re-pickup
+  planning, ~9:56–58pm day 1). Cross-checked marker files, the log's own dispatch/completion counts,
+  and each ticket's real Jira comment history (exactly one plan/implementation comment apiece) — no
+  ticket was ever dispatched a second time.
+- **`DAV-19` (never answered)**: confirmed still `state:needs-input`, single seeded comment, untouched
+  for the full 24.5h — the false-pickup case correctly never fires.
+- **`DAV-20` (answered partway through, decision #18)**: replied at ~9:56pm day 1 with a comment
+  carrying no automation footer (simulating a real author reply). The very next cron tick (~9:58pm)
+  correctly re-picked it up — dispatched, ran a real planning cycle, posted the plan — and the ticket
+  now sits at `state:review`. A second, redundant reply posted later (~12:48am day 2) caused no
+  further action, since by then the ticket had already left `state:needs-input` — confirming
+  re-pickup keys off the ticket's *current* state label, not just comment content, so a stray extra
+  reply is harmless rather than triggering a duplicate cycle.
+- **No marker/lock-file leaks**: both projects' `workers/` directories are empty (no stale or stuck
+  markers); `automation.lock` is the expected always-present `flock` target, unchanged since before
+  the soak started; `context/`, `logs/`, `progress/`, `prompts/`, `result/` still hold entries for
+  every ticket ever processed across Phases D–I — expected, that's the audit trail (decision #8), not
+  a leak.
+
+Cron entry removed (`crontab -e`) once this check confirmed the above; the two pre-existing unrelated
+cron lines were left untouched.
 
 1. Install the real cron entry (`crontab -e`, `*/2 * * * * /path/to/scripts/automation-poll.sh`)
    against the test project(s) only — never point this at a production repo/board for the soak test.
@@ -736,30 +763,39 @@ entry is removed.
 5. Remove the cron entry when done (`crontab -e`, delete the line) unless you're intentionally
    moving straight to production use of the test project.
 
-## Phase J — Sign-off
+## Phase J — Sign-off — GO, 2026-09-04
 
 Go/no-go before pointing this at any real production repo or board. All boxes below should be
 checked, with the corresponding phase's evidence (screenshots, comment links, log excerpts) kept
 somewhere retrievable — even just this file, edited in place with results, is fine.
 
-- [ ] Phase A: versions recorded, `health-check`/`npm test` green.
-- [ ] Phase B: both CLIs' actual flags confirmed working (or: only the provider(s) you intend to use).
-- [ ] Phase C: registration wizard's collision check confirmed to both allow and correctly refuse.
-- [ ] Phase D: dry-run confirmed zero live side effects, correct ticket discovery, correct rendered
+- [x] Phase A: versions recorded, `health-check`/`npm test` green. (`claude` 2.1.259, `gemini`
+      0.58.0, `node` v24.19.0; `health-check` authenticated; `npm test` 326 passed/3 skipped.)
+- [x] Phase B: both CLIs' actual flags confirmed working (Claude and Gemini both exercised end to
+      end in Phases E–I, not just smoke-tested in isolation).
+- [x] Phase C: registration wizard's collision check confirmed to both allow and correctly refuse
+      (Phase C section above; refusal re-confirmed against a real already-claimed app tag, registry
+      byte-for-byte unchanged).
+- [x] Phase D: dry-run confirmed zero live side effects, correct ticket discovery, correct rendered
       prompts.
-- [ ] Phase E: one full real planning cycle, comment/transition/plan-file all verified by hand.
-- [ ] Phase F: one full real implementation cycle, **diff manually reviewed**, Status-promotion path
+- [x] Phase E: one full real planning cycle, comment/transition/plan-file all verified by hand.
+- [x] Phase F: one full real implementation cycle, diff manually reviewed, Status-promotion path
       specifically exercised.
-- [ ] Phase G: crash→restart→escalate, heartbeat, permission sandbox, and flock overlap guard all
+- [x] Phase G: crash→restart→escalate, heartbeat, permission sandbox, and flock overlap guard all
       confirmed working for real, not just in mocked tests.
-- [ ] Phase H: multi-project isolation and `enabled: false` behavior confirmed.
-- [ ] Phase I: 24h+ soak against the test project with no duplicate dispatch, no stuck tickets, no
-      poll-script crashes.
-- [ ] Every provider/CLI version actually tested is recorded (Phase A) so a future drift is
+- [x] Phase H: multi-project isolation and `enabled: false` behavior confirmed.
+- [x] Phase I: 24.5h soak against both test projects, 0 duplicate dispatches, 0 stuck tickets, 0
+      poll-script crashes, 0 marker/lock-file leaks (see Phase I's full writeup above).
+- [x] Every provider/CLI version actually tested is recorded (Phase A) so a future drift is
       traceable.
 
-Only once every box is checked: register a real project, watch its first cycle the same way Phase
-E/F did, and only then trust the cron job unattended against it.
+**Verdict: GO.** Every phase passed against real Jira, real `claude`/`gemini` CLI processes, and a
+real unattended cron invocation — not just mocked tests. 13 real bugs were found and fixed along the
+way (listed at the top of this plan), none of which `npm test`'s mocked suite could have caught on
+its own; zero new bugs surfaced in Phase I's 24.5h soak, the phase specifically designed to catch
+anything only visible after sustained unattended operation. Both providers (Claude and Gemini) are
+confirmed working end to end. Per this phase's own instruction: register a real project next, watch
+its first cycle the same way Phase E/F did, before trusting the cron job fully unattended against it.
 
 ## Open items this plan deliberately does not resolve
 
