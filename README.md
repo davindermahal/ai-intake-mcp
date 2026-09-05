@@ -19,18 +19,21 @@ and two small config files.
 what you'll see, and what to do at each point. It's written for using the tool, not for the
 internals.
 
-## Headless automation (new, not yet validated against a live board)
+## Headless automation
 
 The same pipeline can also run unattended, on a cron, across one or more registered repos — no
-developer present. Fully implemented with full test coverage, but no real headless run has exercised
-it against a live board yet. **See [`docs/headless-automation.md`](docs/headless-automation.md)**
-for the step-by-step path to try it safely (dry-run first, then one manual run, then cron).
+developer present. Fully implemented and validated end to end against a real Jira board, including a
+24.5h unattended cron soak (sign-off: **GO**, see
+[`.ai/plans/completed/headless-automation-qa.md`](.ai/plans/completed/headless-automation-qa.md)).
+**See [`docs/headless-automation.md`](docs/headless-automation.md)** for the step-by-step path to try
+it yourself (dry-run first, then one manual run, then cron) — still start against a throwaway
+repo/board, the same way the validation above did, before pointing it at anything real.
 
 ## Design
 
 See [`.ai/plans/active/ai-intake-mcp-on-demand-planning.md`](.ai/plans/active/ai-intake-mcp-on-demand-planning.md)
 (planning phase), [`.ai/plans/active/ai-intake-mcp-implementation-phase.md`](.ai/plans/active/ai-intake-mcp-implementation-phase.md)
-(implementation phase), and [`.ai/plans/active/headless-automation.md`](.ai/plans/active/headless-automation.md)
+(implementation phase), and [`.ai/plans/completed/headless-automation.md`](.ai/plans/completed/headless-automation.md)
 (headless automation) for the full design records, and [`.ai/README.md`](.ai/README.md) for how
 this project's `.ai/` directory is organized.
 

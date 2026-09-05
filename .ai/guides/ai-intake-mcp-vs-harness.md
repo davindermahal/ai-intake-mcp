@@ -1,6 +1,6 @@
 # `ai-intake-harness` vs. `ai-intake-mcp`: functional differences
 
-Reference doc for the design in `.ai/plans/draft/ai-intake-mcp-on-demand-planning.md`. Written to
+Reference doc for the design in `.ai/plans/active/ai-intake-mcp-on-demand-planning.md`. Written to
 answer one question precisely: **what does the new MCP-based approach actually do differently from
 what this repo already does today**, dimension by dimension, before any code gets written.
 

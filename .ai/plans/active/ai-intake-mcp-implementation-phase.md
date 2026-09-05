@@ -355,7 +355,7 @@ exercised by v1's checkpoint (v1 explicitly scoped its check to `needs-input`/`r
   Stops at `state:verify`, same boundary the harness's own headless worker stops at.
 - **Enforced (code-level) prevention of `git push`/merge during an implementation session** —
   decision #10. Procedure-doc guidance + an opt-in settings snippet only.
-  **Revisited**: `.ai/plans/active/ai-intake-mcp-hardening-phase.md` (2026-08-30), decision #1 —
+  **Revisited**: `.ai/plans/completed/ai-intake-mcp-hardening-phase.md` (2026-08-30), decision #1 —
   `worktree_create` now installs a per-worktree `pre-push`/`pre-merge-commit` git hook that actually
   blocks `git push` and a local non-fast-forward merge, regardless of which agent CLI is driving. A
   fast-forward local merge and any remote-side merge (`gh pr merge`, GitHub's UI) remain unreachable
@@ -405,7 +405,7 @@ exercised by v1's checkpoint (v1 explicitly scoped its check to `needs-input`/`r
 
 ## Remaining open
 
-Both items below were resolved by `.ai/plans/active/ai-intake-mcp-hardening-phase.md` (2026-08-30) —
+Both items below were resolved by `.ai/plans/completed/ai-intake-mcp-hardening-phase.md` (2026-08-30) —
 kept here, unresolved wording included, as the record of what was originally left open and why.
 
 - **Whether `approve_plan` should also verify the plan file has no unresolved Open Questions** before

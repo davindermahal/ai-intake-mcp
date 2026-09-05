@@ -56,7 +56,8 @@ remember: every plan — whether authored interactively or by a headless worker 
 automated tests and, separately, exactly what a human must still manually verify — "None" when
 genuinely nothing needs it. A plan whose manual-QA surface is large enough to warrant its own
 document splits it into a companion `.ai/plans/active/<slug>-qa.md`; see
-`.ai/plans/active/headless-automation-qa.md` for the shape one of those takes.
+`.ai/plans/completed/headless-automation-qa.md` for the shape one of those takes (moved to
+`completed/` once its own sign-off phase passed).
 
 ## `.ai/docs/extracted/`
 

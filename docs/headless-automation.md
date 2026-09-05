@@ -1,21 +1,25 @@
 # Headless automation — testing guide
 
-**Status: implemented, not yet validated against a live board.** Everything below has full unit and
-integration test coverage (`npm test` — see `test/automation/integration.test.ts` for the multi-tick
-simulated-cron scenarios), but no real headless `claude`/`gemini` process has ever actually run
-against a real Jira ticket yet. Treat every step here as first-time validation, not routine
-operation, until you've watched it work end to end at least once.
+**Status: implemented and validated end to end against a real Jira board.** Full unit/integration
+coverage (`npm test` — see `test/automation/integration.test.ts` for the multi-tick simulated-cron
+scenarios) plus a real-system validation pass —
+[`.ai/plans/completed/headless-automation-qa.md`](../.ai/plans/completed/headless-automation-qa.md)
+— covering real `claude`/`gemini` processes, real Jira comments/transitions, failure injection
+(crash/restart/escalate, permission sandbox, cron overlap), and a 24.5h unattended cron soak.
+Sign-off verdict: **GO** (2026-09-04). See "Current limitations" below for the few things that pass
+kept as open observations rather than blockers.
 
-For the full design record (all 22 decisions, why each piece exists), see
-[`.ai/plans/active/headless-automation.md`](../.ai/plans/active/headless-automation.md). This doc is
+For the full design record (all 22+ decisions, why each piece exists), see
+[`.ai/plans/completed/headless-automation.md`](../.ai/plans/completed/headless-automation.md). This doc is
 just the practical "how do I actually try this" path. It assumes the interactive setup in
 [`setup.md`](setup.md) is already done and working (`npm run health-check` passes).
 
-**For a rigorous, checkable validation pass before trusting this unattended against a real repo**,
-follow [`.ai/plans/active/headless-automation-qa.md`](../.ai/plans/active/headless-automation-qa.md)
-instead of just this doc — it turns the steps below into a phased plan with explicit pass/fail
-criteria, including failure-injection (crash/restart/escalate, permission sandbox, cron overlap) and
-a multi-day soak test. This doc remains the quick version for a one-off try.
+**Still use a throwaway test repo/board the first time you try this yourself** — the validation
+above proves the *feature* works, not that your specific Jira project/permissions/CLI versions match
+what was tested. [`.ai/plans/completed/headless-automation-qa.md`](../.ai/plans/completed/headless-automation-qa.md)
+is the phased, checkable validation pass that was actually run, with explicit pass/fail criteria per
+phase — read it for the full evidence, or as a template if you want to re-run an equivalent pass
+against your own setup before trusting it unattended.
 
 ## What this adds
 
@@ -68,7 +72,7 @@ every line straight through — as far as the input stream is concerned, its wri
 so lines arriving before anyone is listening are silently dropped, and the interface then closes on
 EOF. The next `question()` call throws `readline was closed`. (This is exactly what happened testing
 this wizard manually during the headless-automation QA pass — see
-`.ai/plans/active/headless-automation-qa.md`, Phase C.) A FIFO held open with `sleep`s timed to
+`.ai/plans/completed/headless-automation-qa.md`, Phase C.) A FIFO held open with `sleep`s timed to
 outlast each async gap works around it, but it's fragile and slow; prefer the `--path` flags above
 for anything scripted.
 
@@ -207,7 +211,7 @@ auto-detection won't find your install — add the equivalent PATH entry to your
   worktree creation — every project still uses the standard sibling-directory convention.
 - Both providers have been validated against a real board with real processes (planning,
   implementation, crash/restart/escalate, heartbeats, multi-project isolation, a 24h+ cron soak —
-  see `.ai/plans/active/headless-automation-qa.md`). One open observation from that validation:
+  see `.ai/plans/completed/headless-automation-qa.md`). One open observation from that validation:
   real Gemini *implementation* cycles (more tool calls per run than planning) were seen to exit
   silently mid-task with no error a couple of times before completing cleanly on a later attempt —
   the existing crash/restart watchdog logic handles this correctly (a dead PID with no result file

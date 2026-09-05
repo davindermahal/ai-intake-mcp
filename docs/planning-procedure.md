@@ -130,9 +130,9 @@ unattended/scheduled process, anything a soak test would meaningfully validate, 
 failure modes worth deliberately injecting) should split it into a companion QA plan file
 (`.ai/plans/active/<slug>-qa.md`, cross-linked from both directions — name it here, in this section,
 and add this plan to the QA plan's own "Related") rather than bloating this section past readability.
-`.ai/plans/active/headless-automation-qa.md` is the reference example of that shape: phased, each
+`.ai/plans/completed/headless-automation-qa.md` is the reference example of that shape: phased, each
 phase with an objective, literal steps, and explicit pass/fail criteria, ending in a sign-off
-checklist.
+checklist (moved to `completed/` once its own sign-off phase passed).
 
 If a change genuinely has no manual-QA surface at all (a pure internal refactor, nothing outside the
 existing automated suite's reach), say so outright — `"None — automated coverage above is

@@ -1,16 +1,17 @@
 # Plan: headless automation mode for `ai-intake-mcp`
 
-**Status**: active — Phases 1-7 implemented on branch `headless-automation` (all `npm test`/lint/
-typecheck green throughout, TDD per decision #22). Remaining before this can run unattended: a
-human review of the diff/design, then decision #21's last verification layer — real-system
-validation, now its own plan: `.ai/plans/active/headless-automation-qa.md`. See "Implementation
-Order" below for what each phase of *this* plan covers.
+**Status**: complete — Phases 1-7 implemented and merged (all `npm test`/lint/typecheck green
+throughout, TDD per decision #22). Decision #21's last verification layer — real-system validation —
+ran as its own plan, `.ai/plans/completed/headless-automation-qa.md`: every phase passed against a
+real Jira board and real `claude`/`gemini` processes, including a 24.5h unattended cron soak.
+Sign-off verdict: **GO** (2026-09-04). See "Implementation Order" below for what each phase of *this*
+plan covers.
 
 **Created**: 2026-09-02
-**Updated**: 2026-09-03
+**Updated**: 2026-09-04
 
 
-**Related**: `.ai/plans/active/headless-automation-qa.md` (the end-to-end validation plan for
+**Related**: `.ai/plans/completed/headless-automation-qa.md` (the end-to-end validation plan for
 everything implemented here — real Jira, real provider CLIs, real failure injection, not just the
 mocked/simulated coverage `npm test` already gives), `.ai/plans/active/ai-intake-mcp-on-demand-planning.md` (v1, interactive planning),
 `.ai/plans/active/ai-intake-mcp-implementation-phase.md` (interactive implementation — especially
@@ -691,7 +692,7 @@ to the planning phase.
 
 23. **A required `## QA Plan` section, same standing and same structural enforcement as decision
     #22's `## Testing strategy` — added 2026-09-03, after this plan's own implementation was done and
-    a separate QA plan (`.ai/plans/active/headless-automation-qa.md`) had to be written by hand for
+    a separate QA plan (`.ai/plans/completed/headless-automation-qa.md`) had to be written by hand for
     it.** Per your directive: "we must always create a QA plan... what can we automate, but
     importantly, what does a developer or QA have to do to fully QA the implementation." Decision
     #22 already established that `## Testing strategy` is required and TDD-structured — but that
