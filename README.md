@@ -50,13 +50,13 @@ as it resolves before the client starts the server).
 **Claude Code:**
 
 ```bash
-claude mcp add --scope user ai-intake -- npx -y ai-intake-mcp
+claude mcp add --scope user ai-intake -- npx -y @davindermahal/ai-intake-mcp
 ```
 
 **Gemini CLI:**
 
 ```bash
-gemini mcp add --scope user ai-intake npx -y ai-intake-mcp
+gemini mcp add --scope user ai-intake npx -y @davindermahal/ai-intake-mcp
 ```
 
 Or add it directly to an MCP settings file (Claude Desktop's `claude_desktop_config.json`, or any
@@ -67,15 +67,15 @@ other client that reads the same `mcpServers` shape):
   "mcpServers": {
     "ai-intake": {
       "command": "npx",
-      "args": ["-y", "ai-intake-mcp"]
+      "args": ["-y", "@davindermahal/ai-intake-mcp"]
     }
   }
 }
 ```
 
 Want the latest unreleased code straight from `main` instead of the last published npm version?
-Swap `ai-intake-mcp` for `github:davindermahal/ai-intake-mcp` in any of the commands above — `npx`
-fetches the repo and builds it on first launch instead of installing from the registry.
+Swap `@davindermahal/ai-intake-mcp` for `github:davindermahal/ai-intake-mcp` in any of the commands
+above — `npx` fetches the repo and builds it on first launch instead of installing from the registry.
 
 You still need Jira credentials at `~/.config/ai-intake-mcp/.env` — this path skips `install.sh`, so
 create it by hand:
