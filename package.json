@@ -1,0 +1,42 @@
+{
+  "name": "ai-intake-mcp",
+  "version": "0.1.0",
+  "private": true,
+  "description": "On-demand ticket planning via MCP, no cron / no per-project install.",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "bin": {
+    "ai-intake-mcp": "dist/index.js"
+  },
+  "scripts": {
+    "prepare": "npm run build",
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsc -p tsconfig.json --watch",
+    "test": "vitest run",
+    "lint": "eslint src test scripts",
+    "health-check": "node --import tsx scripts/health-check.ts",
+    "smoke:jira": "node --import tsx scripts/jira-smoke-check.ts",
+    "smoke:jira:create-issue": "node --import tsx scripts/jira-smoke-check-create-issue.ts",
+    "register-project": "node --import tsx scripts/register-project.ts",
+    "automation-poll": "node --import tsx scripts/automation-poll.ts"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.19.0",
+    "better-sqlite3": "^11.10.0",
+    "keytar": "^7.9.0",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.19.0",
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/node": "^24.0.0",
+    "eslint": "^9.19.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3",
+    "typescript-eslint": "^8.21.0",
+    "vitest": "^3.0.4"
+  }
+}
