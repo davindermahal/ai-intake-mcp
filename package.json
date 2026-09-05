@@ -11,6 +11,7 @@
     "ai-intake-mcp": "dist/index.js"
   },
   "scripts": {
+    "prepare": "npm run build",
     "build": "tsc -p tsconfig.json",
     "dev": "tsc -p tsconfig.json --watch",
     "test": "vitest run",

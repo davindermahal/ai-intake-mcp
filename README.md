@@ -36,13 +36,69 @@ this project's `.ai/` directory is organized.
 
 ## Setup
 
+### Option A — install directly, no cloning
+
+Register the server straight from GitHub — `npx` fetches the repo and builds it on first launch, no
+local clone or `dist/` to keep up to date by hand. Requires Node >=24 on the `PATH` of whatever spawns
+the command below (a version manager like `nvm` is fine, as long as it resolves before the client
+starts the server).
+
+**Claude Code:**
+
+```bash
+claude mcp add --scope user ai-intake -- npx -y github:davindermahal/ai-intake-mcp
+```
+
+**Gemini CLI:**
+
+```bash
+gemini mcp add --scope user ai-intake npx -y github:davindermahal/ai-intake-mcp
+```
+
+Or add it directly to an MCP settings file (Claude Desktop's `claude_desktop_config.json`, or any
+other client that reads the same `mcpServers` shape):
+
+```json
+{
+  "mcpServers": {
+    "ai-intake": {
+      "command": "npx",
+      "args": ["-y", "github:davindermahal/ai-intake-mcp"]
+    }
+  }
+}
+```
+
+You still need Jira credentials at `~/.config/ai-intake-mcp/.env` — this path skips `install.sh`, so
+create it by hand:
+
+```bash
+mkdir -p ~/.config/ai-intake-mcp
+cat > ~/.config/ai-intake-mcp/.env <<'EOF'
+JIRA_SITE_URL=https://your-site.atlassian.net
+JIRA_INTAKE_EMAIL=you@your-domain.com
+JIRA_INTAKE_API_TOKEN=your-api-token-here
+EOF
+chmod 600 ~/.config/ai-intake-mcp/.env
+```
+
+(No API token available? Leave `JIRA_INTAKE_API_TOKEN` unset instead — see
+[`docs/setup.md`](docs/setup.md#3-set-up-jira-credentials) for the browser-cookie fallback.) Then
+verify with `npm run health-check` from any clone, or by asking your agent to call the `health_check`
+MCP tool directly.
+
+`npx` caches its first build of the repo and reuses it on later launches; to pick up a real update
+later, clear that cache (`rm -rf ~/.npm/_npx`) so the next launch re-fetches and rebuilds.
+
+### Option B — clone and install
+
 ```bash
 git clone https://github.com/davindermahal/ai-intake-mcp ~/dev/ai-intake-mcp
 cd ~/dev/ai-intake-mcp && ./install.sh
 ```
 
 See [`docs/setup.md`](docs/setup.md) for what that does and does not automate (Jira credentials
-still need to be filled in by hand).
+still need to be filled in by hand), and for the full walk-through either way.
 
 ## License
 
