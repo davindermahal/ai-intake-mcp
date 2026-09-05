@@ -1,12 +1,26 @@
 import { createCipheriv, pbkdf2Sync } from "node:crypto";
-import { describe, expect, it } from "vitest";
-import {
-  bareDomain,
-  decryptChromeLinuxValue,
-  getJiraCookieHeader,
-  type CookieRow,
-  type CookieStoreDeps,
-} from "../../src/jira/auth-cookie.js";
+import { existsSync, mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import Database from "better-sqlite3";
+import { describe, expect, it, vi } from "vitest";
+import type { CookieRow, CookieStoreDeps } from "../../src/jira/auth-cookie.js";
+
+const mkdirSyncSpy = vi.fn();
+vi.mock("node:fs", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("node:fs")>();
+  return {
+    ...actual,
+    mkdirSync: (...args: Parameters<typeof actual.mkdirSync>) => {
+      mkdirSyncSpy(...args);
+      return actual.mkdirSync(...args);
+    },
+  };
+});
+
+const { bareDomain, decryptChromeLinuxValue, getJiraCookieHeader, readCookieRowsFromChromeDb } = await import(
+  "../../src/jira/auth-cookie.js"
+);
 
 const SAFE_STORAGE_PASSWORD = "test-safe-storage-password";
 
@@ -133,5 +147,54 @@ describe("getJiraCookieHeader", () => {
     };
     const header = await getJiraCookieHeader("https://example.atlassian.net", "chrome", deps);
     expect(header).toBe("a=1; b=2");
+  });
+
+  it("skips a cookie that fails to decrypt instead of aborting the whole header", async () => {
+    const corrupt: CookieRow = {
+      name: "marketing-tracker",
+      encrypted_value: Buffer.concat([Buffer.from("v99", "latin1"), Buffer.alloc(16)]),
+      expires_utc: 0,
+    };
+    const valid: CookieRow = {
+      name: "cloud.session.token",
+      encrypted_value: encryptChromeLinuxValue("real-session", SAFE_STORAGE_PASSWORD),
+      expires_utc: 0,
+    };
+    const deps: CookieStoreDeps = {
+      cookiesDbExists: () => true,
+      findKeyringPassword: async () => SAFE_STORAGE_PASSWORD,
+      readCookieRows: () => [corrupt, valid],
+    };
+    const header = await getJiraCookieHeader("https://example.atlassian.net", "chrome", deps);
+    expect(header).toBe("cloud.session.token=real-session");
+  });
+});
+
+describe("readCookieRowsFromChromeDb", () => {
+  it("copies the cookies DB into a 0700 temp directory and cleans it up afterward", () => {
+    const sourceDir = mkdtempSync(join(tmpdir(), "ai-intake-mcp-cookies-src-"));
+    const sourceDb = join(sourceDir, "Cookies");
+    const db = new Database(sourceDb);
+    db.exec(
+      "CREATE TABLE cookies (name TEXT, encrypted_value BLOB, expires_utc INTEGER, host_key TEXT)",
+    );
+    db.prepare("INSERT INTO cookies VALUES (?, ?, ?, ?)").run(
+      "cloud.session.token",
+      Buffer.from("v10ciphertext"),
+      0,
+      ".atlassian.net",
+    );
+    db.close();
+
+    mkdirSyncSpy.mockClear();
+    const rows = readCookieRowsFromChromeDb(sourceDb, "atlassian.net");
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.name).toBe("cloud.session.token");
+
+    expect(mkdirSyncSpy).toHaveBeenCalledTimes(1);
+    const [tmpDirArg, mkdirOptions] = mkdirSyncSpy.mock.calls[0]!;
+    expect(mkdirOptions).toMatchObject({ recursive: true, mode: 0o700 });
+    expect(existsSync(tmpDirArg as string)).toBe(false); // cleaned up afterward
   });
 });

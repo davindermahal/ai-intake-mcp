@@ -1,5 +1,5 @@
 import { createDecipheriv, pbkdf2Sync } from "node:crypto";
-import { copyFileSync, existsSync, unlinkSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, rmSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import Database from "better-sqlite3";
@@ -59,11 +59,15 @@ export interface CookieStoreDeps {
   readCookieRows: (cookiesDbPath: string, domain: string) => CookieRow[];
 }
 
-function readCookieRowsFromChromeDb(cookiesDbPath: string, domain: string): CookieRow[] {
+export function readCookieRowsFromChromeDb(cookiesDbPath: string, domain: string): CookieRow[] {
   // Chrome keeps an exclusive lock on its live Cookies DB — read from a throwaway copy instead.
-  const tmpCopy = join(tmpdir(), `ai-intake-mcp-cookies-${process.pid}-${Date.now()}.sqlite`);
-  copyFileSync(cookiesDbPath, tmpCopy);
+  // The copy is placed in a 0700 subdirectory (not tmpdir() directly) since it briefly holds live
+  // session cookies for every site the developer is logged into, and /tmp is world-readable.
+  const tmpDir = join(tmpdir(), `ai-intake-mcp-${process.pid}-${Date.now()}`);
+  mkdirSync(tmpDir, { recursive: true, mode: 0o700 });
+  const tmpCopy = join(tmpDir, "cookies.sqlite");
   try {
+    copyFileSync(cookiesDbPath, tmpCopy);
     const db = new Database(tmpCopy, { readonly: true });
     try {
       return db
@@ -73,7 +77,7 @@ function readCookieRowsFromChromeDb(cookiesDbPath: string, domain: string): Cook
       db.close();
     }
   } finally {
-    unlinkSync(tmpCopy);
+    rmSync(tmpDir, { recursive: true, force: true });
   }
 }
 
@@ -127,9 +131,16 @@ export async function getJiraCookieHeader(
   }
 
   const nowChromeEpoch = (Date.now() + 11644473600000) * 1000;
-  const pairs = rows
-    .filter((row) => row.expires_utc === 0 || row.expires_utc > nowChromeEpoch)
-    .map((row) => `${row.name}=${decryptChromeLinuxValue(row.encrypted_value, safeStoragePassword)}`);
+  const pairs: string[] = [];
+  for (const row of rows) {
+    if (row.expires_utc !== 0 && row.expires_utc <= nowChromeEpoch) continue;
+    try {
+      pairs.push(`${row.name}=${decryptChromeLinuxValue(row.encrypted_value, safeStoragePassword)}`);
+    } catch {
+      // A single unrelated cookie (tracking/marketing) failing to decrypt shouldn't abort the whole
+      // fallback — skip it and keep whatever else decrypts successfully.
+    }
+  }
 
   if (pairs.length === 0) {
     throw new Error(

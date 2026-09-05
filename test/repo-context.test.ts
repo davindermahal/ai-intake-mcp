@@ -21,6 +21,11 @@ function writeRawConfig(config: Record<string, unknown>): void {
   writeFileSync(join(repoRoot, ".ai", "intake-mcp.json"), JSON.stringify(config), "utf8");
 }
 
+function writeConfigFile(contents: string): void {
+  mkdirSync(join(repoRoot, ".ai"), { recursive: true });
+  writeFileSync(join(repoRoot, ".ai", "intake-mcp.json"), contents, "utf8");
+}
+
 describe("readRepoConfig", () => {
   it("returns undefined when no config file exists", () => {
     expect(readRepoConfig(repoRoot)).toBeUndefined();
@@ -58,6 +63,16 @@ describe("readRepoConfig", () => {
   it("throws when appTag is missing", () => {
     writeRawConfig({ jiraProjectKeys: ["DAV"] });
     expect(() => readRepoConfig(repoRoot)).toThrow(/malformed/);
+  });
+
+  it("throws when skipTargets is present but not an array of strings", () => {
+    writeRawConfig({ jiraProjectKeys: ["DAV"], appTag: "app:my-repo", skipTargets: [1, 2] });
+    expect(() => readRepoConfig(repoRoot)).toThrow(/malformed/);
+  });
+
+  it("throws a friendly error on malformed JSON instead of a raw SyntaxError", () => {
+    writeConfigFile("{ not valid json");
+    expect(() => readRepoConfig(repoRoot)).toThrow(/not valid JSON/);
   });
 });
 

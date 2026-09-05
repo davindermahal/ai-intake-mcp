@@ -81,6 +81,21 @@ describe("fetchIssue", () => {
     expect(issue.comments).toEqual([{ author: "Ada", body: "hi", created: "2026-01-01" }]);
     expect(issue.labels).toEqual(["state:plan"]);
   });
+
+  it("throws a clear error naming the ticket when Jira's payload is missing required fields", async () => {
+    const fetchImpl = vi.fn(async () =>
+      jsonResponse({
+        key: "DAV-5",
+        fields: {
+          // status is missing entirely — simulates upstream API drift
+          summary: "Fix the thing",
+        },
+      }),
+    );
+    await expect(fetchIssue(clientWith(fetchImpl), "DAV-5")).rejects.toThrow(
+      /unexpected shape for issue DAV-5/,
+    );
+  });
 });
 
 describe("assertAssigneeOrAutoAssign", () => {

@@ -63,7 +63,9 @@ afterEach(() => {
 });
 
 function makeClient(fetchImpl: typeof fetch): JiraClient {
-  return new JiraClient({ config, fetchImpl });
+  // sleepImpl is a no-op: this suite doesn't exercise retry/backoff itself (see client.test.ts for
+  // that), so a real 500 response here shouldn't incur real retry delays.
+  return new JiraClient({ config, fetchImpl, sleepImpl: async () => {} });
 }
 
 function issueResponse(labels: string[]): Response {

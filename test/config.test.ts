@@ -126,4 +126,28 @@ describe("loadGlobalConfig", () => {
     expect(config.jiraSiteUrl).toBe("https://example.atlassian.net");
     expect(config.jiraEmail).toBe("bot@example.com");
   });
+
+  it("strips a trailing inline comment from an unquoted value", () => {
+    readFileSyncMock.mockReturnValue(
+      "JIRA_SITE_URL=example.atlassian.net\nJIRA_INTAKE_EMAIL=dev@example.com # Personal Account\n",
+    );
+    const config = loadGlobalConfig();
+    expect(config.jiraEmail).toBe("dev@example.com");
+  });
+
+  it("preserves a '#' inside a quoted value", () => {
+    readFileSyncMock.mockReturnValue(
+      'JIRA_SITE_URL=example.atlassian.net\nJIRA_INTAKE_EMAIL="dev@example.com # not a comment"\n',
+    );
+    const config = loadGlobalConfig();
+    expect(config.jiraEmail).toBe("dev@example.com # not a comment");
+  });
+
+  it("leaves a '#' with no preceding whitespace untouched", () => {
+    readFileSyncMock.mockReturnValue(
+      "JIRA_SITE_URL=example.atlassian.net\nJIRA_INTAKE_EMAIL=dev@example.com\nJIRA_COOKIE_BROWSER=chrome#not-a-comment\n",
+    );
+    const config = loadGlobalConfig();
+    expect(config.jiraCookieBrowser).toBe("chrome#not-a-comment");
+  });
 });

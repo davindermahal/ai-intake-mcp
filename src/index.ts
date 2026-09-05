@@ -51,7 +51,7 @@ server.registerTool(
   {
     description:
       "Verifies Jira credentials load, the site is reachable, and the configured in-progress " +
-      "native status exists on the board.",
+      "and code-review native statuses exist on the board.",
     inputSchema: {},
     annotations: { readOnlyHint: true, title: "Health check" },
   },

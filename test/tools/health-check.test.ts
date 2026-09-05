@@ -17,7 +17,9 @@ function jsonResponse(body: unknown, status = 200): Response {
 }
 
 function makeClient(fetchImpl: typeof fetch): JiraClient {
-  return new JiraClient({ config, fetchImpl });
+  // sleepImpl is a no-op: this suite doesn't exercise retry/backoff itself (see client.test.ts for
+  // that), so a real 5xx response here shouldn't incur real retry delays.
+  return new JiraClient({ config, fetchImpl, sleepImpl: async () => {} });
 }
 
 describe("healthCheck", () => {
@@ -29,29 +31,44 @@ describe("healthCheck", () => {
     expect(fetchImpl).toHaveBeenCalledTimes(1);
   });
 
-  it("succeeds when authenticated and the in-progress status exists", async () => {
+  it("succeeds when authenticated and both native statuses exist", async () => {
     const fetchImpl = vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);
       if (url.endsWith("/myself")) return jsonResponse({ accountId: "me", displayName: "Bot" });
-      if (url.endsWith("/status")) return jsonResponse([{ name: "In Progress" }, { name: "Done" }]);
+      if (url.endsWith("/status")) {
+        return jsonResponse([{ name: "In Progress" }, { name: "Code Review" }, { name: "Done" }]);
+      }
       throw new Error(`unexpected url ${url}`);
     });
     const result = await healthCheck(makeClient(fetchImpl), config);
     expect(result.ok).toBe(true);
     expect(result.details.some((d) => d.includes("Authenticated as Bot"))).toBe(true);
     expect(result.details.some((d) => d.includes('Native status "In Progress" exists'))).toBe(true);
+    expect(result.details.some((d) => d.includes('Native status "Code Review" exists'))).toBe(true);
   });
 
   it("reports ok:false when the in-progress status doesn't exist on the site", async () => {
     const fetchImpl = vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);
       if (url.endsWith("/myself")) return jsonResponse({ accountId: "me", displayName: "Bot" });
-      if (url.endsWith("/status")) return jsonResponse([{ name: "Backlog" }]);
+      if (url.endsWith("/status")) return jsonResponse([{ name: "Code Review" }]);
       throw new Error(`unexpected url ${url}`);
     });
     const result = await healthCheck(makeClient(fetchImpl), config);
     expect(result.ok).toBe(false);
-    expect(result.details.some((d) => d.includes("was not found"))).toBe(true);
+    expect(result.details.some((d) => d.includes('"In Progress" was not found'))).toBe(true);
+  });
+
+  it("reports ok:false when the code-review status doesn't exist on the site", async () => {
+    const fetchImpl = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith("/myself")) return jsonResponse({ accountId: "me", displayName: "Bot" });
+      if (url.endsWith("/status")) return jsonResponse([{ name: "In Progress" }]);
+      throw new Error(`unexpected url ${url}`);
+    });
+    const result = await healthCheck(makeClient(fetchImpl), config);
+    expect(result.ok).toBe(false);
+    expect(result.details.some((d) => d.includes('"Code Review" was not found'))).toBe(true);
   });
 
   it("reports ok:false when the status check itself fails", async () => {

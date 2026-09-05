@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -145,6 +145,15 @@ describe("worktreeRemove", () => {
 
     const result = worktreeRemove("DAV-5", {}, repoRoot);
     expect(result.branch.removed).toBe(true);
+  });
+
+  it("refuses to remove a merged worktree with uncommitted changes when force is not set", async () => {
+    const created = await worktreeCreate("DAV-5", async () => "Fix the thing", repoRoot);
+    git(["merge", "--no-ff", "-m", "merge it", created.branch], repoRoot);
+    writeFileSync(join(created.worktreePath, "untracked.txt"), "local work in progress");
+
+    expect(() => worktreeRemove("DAV-5", {}, repoRoot)).toThrow();
+    expect(findWorktreeForTicket("DAV-5", repoRoot)).toEqual(created);
   });
 
   it("keeps the branch when keepBranch is set", async () => {

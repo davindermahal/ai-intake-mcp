@@ -161,8 +161,12 @@ export function worktreeRemove(
     );
   }
 
+  const removeArgs = ["worktree", "remove"];
+  if (options.force) removeArgs.push("--force");
+  removeArgs.push(worktreePath);
+
   try {
-    git(["worktree", "remove", "--force", worktreePath], repoRoot);
+    git(removeArgs, repoRoot);
   } catch (err) {
     throw new Error(`Failed to remove worktree at ${worktreePath}: ${(err as Error).message}`);
   }

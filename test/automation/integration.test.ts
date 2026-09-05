@@ -50,7 +50,13 @@ class FakeBoard {
         summary: issue.summary,
         status: { name: "To Do" },
         description: null,
-        comment: { comments: issue.comments },
+        comment: {
+          comments: issue.comments.map((c) => ({
+            author: { displayName: c.author },
+            body: c.body,
+            created: c.created,
+          })),
+        },
         labels: issue.labels,
         assignee: { accountId: "me" },
       },

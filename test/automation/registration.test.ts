@@ -39,7 +39,9 @@ function issueJson(key: string, labels: string[]) {
 }
 
 function makeClient(fetchImpl: typeof fetch): JiraClient {
-  return new JiraClient({ config, fetchImpl });
+  // sleepImpl is a no-op: this suite doesn't exercise retry/backoff itself (see client.test.ts for
+  // that), so a real 5xx response here shouldn't incur real retry delays.
+  return new JiraClient({ config, fetchImpl, sleepImpl: async () => {} });
 }
 
 let parentDir: string;

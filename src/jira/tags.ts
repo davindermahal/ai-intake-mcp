@@ -1,3 +1,4 @@
+import { z } from "zod";
 import type { GlobalConfig } from "../config.js";
 import { adfToPlainText, plainTextToAdf } from "./adf.js";
 import type { JiraClient } from "./client.js";
@@ -76,23 +77,25 @@ export class AppTagConflictError extends Error {
   }
 }
 
-interface RawJiraComment {
-  author?: { displayName?: string };
-  body?: unknown;
-  created?: string;
-}
+const RawJiraCommentSchema = z.object({
+  author: z.object({ displayName: z.string().optional() }).optional(),
+  body: z.unknown(),
+  created: z.string().optional(),
+});
 
-export interface RawJiraIssue {
-  key: string;
-  fields: {
-    summary: string;
-    status: { name: string };
-    description: unknown;
-    comment?: { comments: RawJiraComment[] };
-    labels?: string[];
-    assignee?: { accountId: string } | null;
-  };
-}
+const RawJiraIssueSchema = z.object({
+  key: z.string(),
+  fields: z.object({
+    summary: z.string(),
+    status: z.object({ name: z.string() }),
+    description: z.unknown(),
+    comment: z.object({ comments: z.array(RawJiraCommentSchema) }).optional(),
+    labels: z.array(z.string()).optional(),
+    assignee: z.object({ accountId: z.string() }).nullable().optional(),
+  }),
+});
+
+export type RawJiraIssue = z.infer<typeof RawJiraIssueSchema>;
 
 /** Shared by `fetchIssue` (one ticket) and `searchIssues` (`src/jira/search.ts`, many tickets from
  * one JQL query) — both return the Jira API's issue shape, just via different endpoints. */
@@ -114,10 +117,14 @@ export function rawIssueToJiraIssue(raw: RawJiraIssue): JiraIssue {
 }
 
 export async function fetchIssue(client: JiraClient, key: string): Promise<JiraIssue> {
-  const raw = await client.get<RawJiraIssue>(
+  const rawResponse = await client.get<unknown>(
     `/rest/api/3/issue/${encodeURIComponent(key)}?fields=summary,status,description,comment,labels,assignee,project`,
   );
-  return rawIssueToJiraIssue(raw);
+  const result = RawJiraIssueSchema.safeParse(rawResponse);
+  if (!result.success) {
+    throw new Error(`Jira returned an unexpected shape for issue ${key}: ${result.error.message}`);
+  }
+  return rawIssueToJiraIssue(result.data);
 }
 
 export async function createIssue(

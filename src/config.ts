@@ -28,6 +28,11 @@ function parseEnvFile(contents: string): Record<string, string> {
       (value.startsWith("'") && value.endsWith("'"))
     ) {
       value = value.slice(1, -1);
+    } else {
+      // Only an unquoted value can carry a trailing inline comment; strip it and re-trim. The `#`
+      // must be preceded by whitespace so a bare "#" inside a value (e.g. a URL fragment) survives.
+      const commentStart = value.search(/\s#/);
+      if (commentStart !== -1) value = value.slice(0, commentStart).trim();
     }
     vars[key] = value;
   }
