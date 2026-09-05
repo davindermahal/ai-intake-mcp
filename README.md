@@ -43,21 +43,20 @@ this project's `.ai/` directory is organized.
 
 ### Option A — install directly, no cloning
 
-Register the server straight from GitHub — `npx` fetches the repo and builds it on first launch, no
-local clone or `dist/` to keep up to date by hand. Requires Node >=24 on the `PATH` of whatever spawns
-the command below (a version manager like `nvm` is fine, as long as it resolves before the client
-starts the server).
+Register the server via `npx` — no local clone or `dist/` to keep up to date by hand. Requires Node
+>=24 on the `PATH` of whatever spawns the command below (a version manager like `nvm` is fine, as long
+as it resolves before the client starts the server).
 
 **Claude Code:**
 
 ```bash
-claude mcp add --scope user ai-intake -- npx -y github:davindermahal/ai-intake-mcp
+claude mcp add --scope user ai-intake -- npx -y ai-intake-mcp
 ```
 
 **Gemini CLI:**
 
 ```bash
-gemini mcp add --scope user ai-intake npx -y github:davindermahal/ai-intake-mcp
+gemini mcp add --scope user ai-intake npx -y ai-intake-mcp
 ```
 
 Or add it directly to an MCP settings file (Claude Desktop's `claude_desktop_config.json`, or any
@@ -68,11 +67,15 @@ other client that reads the same `mcpServers` shape):
   "mcpServers": {
     "ai-intake": {
       "command": "npx",
-      "args": ["-y", "github:davindermahal/ai-intake-mcp"]
+      "args": ["-y", "ai-intake-mcp"]
     }
   }
 }
 ```
+
+Want the latest unreleased code straight from `main` instead of the last published npm version?
+Swap `ai-intake-mcp` for `github:davindermahal/ai-intake-mcp` in any of the commands above — `npx`
+fetches the repo and builds it on first launch instead of installing from the registry.
 
 You still need Jira credentials at `~/.config/ai-intake-mcp/.env` — this path skips `install.sh`, so
 create it by hand:
@@ -92,8 +95,9 @@ chmod 600 ~/.config/ai-intake-mcp/.env
 verify with `npm run health-check` from any clone, or by asking your agent to call the `health_check`
 MCP tool directly.
 
-`npx` caches its first build of the repo and reuses it on later launches; to pick up a real update
-later, clear that cache (`rm -rf ~/.npm/_npx`) so the next launch re-fetches and rebuilds.
+`npx` caches its first resolution and reuses it on later launches; to pick up a real update later,
+clear that cache (`rm -rf ~/.npm/_npx`) so the next launch re-fetches (and, for the `github:` form,
+rebuilds).
 
 ### Option B — clone and install
 
