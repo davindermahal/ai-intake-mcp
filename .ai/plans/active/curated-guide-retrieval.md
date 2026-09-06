@@ -181,8 +181,8 @@ Jira ones only when set:
 
 ```
 CONFLUENCE_SITE_URL=   # falls back to JIRA_SITE_URL if unset
-CONFLUENCE_EMAIL=      # falls back to JIRA_EMAIL if unset
-CONFLUENCE_API_TOKEN=  # falls back to JIRA_API_TOKEN if unset
+CONFLUENCE_EMAIL=      # falls back to JIRA_INTAKE_EMAIL if unset
+CONFLUENCE_API_TOKEN=  # falls back to JIRA_INTAKE_API_TOKEN if unset
 ```
 
 `src/confluence/client.ts` (sibling to `src/jira/client.ts`, same `JiraClientOptions`-style shape —
