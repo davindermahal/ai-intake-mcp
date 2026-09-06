@@ -12,10 +12,13 @@ import { McpServer, type CallToolResult } from "@modelcontextprotocol/server";
 import { StdioServerTransport } from "@modelcontextprotocol/server/stdio";
 import { z } from "zod";
 import { loadGlobalConfig, type GlobalConfig } from "./config.js";
+import { ConfluenceClient } from "./confluence/client.js";
 import { JiraClient } from "./jira/client.js";
 import { approvePlanTool } from "./tools/approve-plan.js";
+import { fetchGuide } from "./tools/fetch-guide.js";
 import { healthCheck } from "./tools/health-check.js";
 import { implementTicketTool } from "./tools/implement-ticket.js";
+import { listGuides } from "./tools/list-guides.js";
 import { trackerAddComment } from "./tools/tracker-add-comment.js";
 import { trackerCreateIssue } from "./tools/tracker-create-issue.js";
 import { trackerGetIssue } from "./tools/tracker-get-issue.js";
@@ -36,6 +39,9 @@ function getConfig(): GlobalConfig {
 }
 function getClient(): JiraClient {
   return new JiraClient({ config: getConfig() });
+}
+function getConfluenceClient(): ConfluenceClient {
+  return new ConfluenceClient({ config: getConfig() });
 }
 
 function ok(structuredContent: object): CallToolResult {
@@ -82,6 +88,43 @@ server.registerTool(
   async ({ key }) => {
     try {
       return ok(await trackerGetIssue(getClient(), key));
+    } catch (err) {
+      return fail(err);
+    }
+  },
+);
+
+server.registerTool(
+  "list_guides",
+  {
+    description:
+      "Lists the curated Confluence guide catalog (title, description, tags — not full content or " +
+      "link) for the planning agent to match against a ticket. Reports configured: false rather " +
+      "than erroring if CONFLUENCE_GUIDE_INDEX_URL isn't set — the feature is simply off then.",
+    inputSchema: z.object({}),
+    annotations: { readOnlyHint: true, title: "List guides" },
+  },
+  async () => {
+    try {
+      return ok(await listGuides(getConfluenceClient(), getConfig()));
+    } catch (err) {
+      return fail(err);
+    }
+  },
+);
+
+server.registerTool(
+  "fetch_guide",
+  {
+    description:
+      "Fetches a guide's full content by exact title. Scoped only to titles present in the " +
+      "list_guides catalog — there is no raw Confluence search, by design.",
+    inputSchema: z.object({ title: z.string().describe("Exact guide title, from list_guides") }),
+    annotations: { readOnlyHint: true, title: "Fetch guide" },
+  },
+  async ({ title }) => {
+    try {
+      return ok(await fetchGuide(getConfluenceClient(), getConfig(), title));
     } catch (err) {
       return fail(err);
     }
