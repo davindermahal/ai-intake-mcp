@@ -19,6 +19,20 @@ Use the `summary`, `status`, `description`, and `comments` already returned by `
 Read the existing comments so you don't re-ask something the ticket's author already answered in a
 previous round.
 
+### Check for a relevant guide
+
+Call `list_guides`. If it reports the guide index isn't configured, skip this entirely — today's
+behavior, unchanged. Otherwise:
+
+- Always give any `always`-tagged entry (e.g. company conventions) a light default check.
+- Match the ticket's summary/description against the other entries' titles/descriptions (e.g. a
+  ticket that says "upgrade app from Symfony 4.4" matches a "Symfony 4→5 Upgrade" title).
+- Call `fetch_guide` **only** for entries that actually matched — don't fetch everything in the
+  catalog "just in case." If nothing matches, don't fall back to searching Confluence directly;
+  there is no such tool, by design.
+- A fetched guide's steps inform the plan you write in step 2, especially `## Implementation
+  order` and `## Key decisions` — treat it as prescriptive, not merely background reading.
+
 ## 2. Find or create the plan file
 
 The deliverable is one file: `.ai/plans/active/<TICKET-KEY>-<slug>.md` (decision #7 — this lands in
@@ -43,6 +57,8 @@ ls .ai/plans/active/<TICKET-KEY>-*.md
 **Branch**: <branch returned by worktree_create>
 **Created**: <YYYY-MM-DD>
 **Updated**: <YYYY-MM-DD>
+**Guides used**: <comma-separated guide title(s) fetched and applied, e.g. "Symfony 4→5 Upgrade" —
+omit this line entirely when no guide matched>
 ```
 
 Then: **Goal**, **Scope** (in/out), **Files to change** (one-line reason each), **Key decisions**,
@@ -210,7 +226,9 @@ Never `git push` — same boundary as implementation sessions (`docs://implement
 2. `tracker_transition(key, "needs-input")`
 
 **No blocking questions:**
-1. `tracker_add_comment(key, "Plan ready for review at .ai/plans/active/<KEY>-<slug>.md. Summary: <2-4 sentence summary of approach, files, and key decisions>.")`
+1. `tracker_add_comment(key, "Plan ready for review at .ai/plans/active/<KEY>-<slug>.md. Summary: <2-4 sentence summary of approach, files, and key decisions>.")` —
+   if any guide was consulted (per "Check for a relevant guide" in step 1), name it in the summary,
+   e.g. "...following the Symfony 4→5 Upgrade guide."
 2. `tracker_transition(key, "review")`
 
 That's the end of the session for this ticket. Do not attempt to move it further (`state:implement`
