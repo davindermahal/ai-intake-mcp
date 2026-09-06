@@ -75,6 +75,9 @@ CONFLUENCE_GUIDE_INDEX_URL=https://confluence.example.com/pages/GUIDE_INDEX
 - Company use: set it once, in the shared `.env` convention the Jira fields already use.
 - This same file is also where `ai-intake-documentation-mcp`'s guide-authoring/sync tools read and
   write their own Confluence settings (`CONFLUENCE_SPACE_KEY`, etc.) — see Key decision #7.
+- `CONFLUENCE_SITE_URL`/`CONFLUENCE_EMAIL`/`CONFLUENCE_API_TOKEN` are also optional here (Key
+  decision #6) — override the Jira fields only if Confluence turns out to be a separate
+  tenant/instance.
 
 ### 3. Retrieval flow (agent-driven, not pre-wired per ticket type)
 
@@ -169,16 +172,26 @@ a developer plans tickets in — not a per-project setting like `jiraProjectKey`
 (`src/config.ts`), not in a committed per-repo file. This also matches the "personal use: leave it
 unset" goal more directly — one unset env var, not a per-repo opt-out check in every project.
 
-### 6. Confluence client reuses the Jira client's auth chokepoint pattern (confirm at review)
+### 6. Confluence client reuses the Jira client's auth chokepoint pattern, with per-field override
 
-Confluence and Jira are typically the same Atlassian Cloud/Server tenant sharing auth, so the new
-client (`src/confluence/client.ts`, sibling to `src/jira/client.ts`) should follow the same
-`JiraClientOptions`-style shape — token-vs-cookie decided in one `authHeaders()` chokepoint,
-`fetchImpl` injectable for tests — pointed at `/wiki/rest/api` instead of `/rest/api`. **Assumption
-to confirm, not fully closed**: this holds for a standard shared-tenant setup, but an org running
-Confluence and Jira as genuinely separate instances/credentials would need its own auth config. Flag
-at review rather than blocking on it now — the common case is worth building for directly, and the
-separate-instance case is a config-shape extension, not a rearchitecture.
+**Resolved.** Confluence and Jira are believed to be the same Atlassian Cloud tenant here, but not
+confirmed with certainty — rather than build for the assumption and leave the separate-instance
+case as a future rearchitecture, `GlobalConfig` gets three new *optional* fields that override the
+Jira ones only when set:
+
+```
+CONFLUENCE_SITE_URL=   # falls back to JIRA_SITE_URL if unset
+CONFLUENCE_EMAIL=      # falls back to JIRA_EMAIL if unset
+CONFLUENCE_API_TOKEN=  # falls back to JIRA_API_TOKEN if unset
+```
+
+`src/confluence/client.ts` (sibling to `src/jira/client.ts`, same `JiraClientOptions`-style shape —
+token auth decided in one `authHeaders()` chokepoint, `fetchImpl` injectable for tests — pointed at
+`/wiki/rest/api` instead of `/rest/api`) resolves site/email/token with `confluence* ?? jira*` at
+construction time. Default behavior (all three unset) is exactly the shared-tenant assumption;
+discovering later that Confluence is actually separate needs only setting these three env vars, not
+a config-shape change. Confirmed target: Confluence **Cloud** (`/wiki/rest/api/content`, works
+correctly there).
 
 ### 7. `ai-intake-documentation-mcp` shares this same config file for its write-side settings
 
@@ -194,8 +207,8 @@ other repo's tooling that points at this path instead of inventing its own.
 
 ## Implementation steps (draft)
 
-1. Add `CONFLUENCE_GUIDE_INDEX_URL` (optional) to `GlobalConfig`/`loadGlobalConfig` in
-   `src/config.ts`.
+1. Add `CONFLUENCE_GUIDE_INDEX_URL`, `CONFLUENCE_SITE_URL`, `CONFLUENCE_EMAIL`, and
+   `CONFLUENCE_API_TOKEN` (all optional) to `GlobalConfig`/`loadGlobalConfig` in `src/config.ts`.
 2. Build `src/confluence/client.ts` (auth/fetch, following `src/jira/client.ts`'s pattern per Key
    decision #6) and `src/confluence/index-parser.ts` (parse the index page's table into
    `{title, description, link, tags}[]`).
