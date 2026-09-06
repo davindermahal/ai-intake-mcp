@@ -1,6 +1,6 @@
 # Plan (draft): `ai-intake-mcp` — curated Confluence guide retrieval
 
-**Status**: draft
+**Status**: active
 **Created**: 2026-09-05
 **Updated**: 2026-09-06
 **Related**: `docs/planning-procedure.md` (wiring point — step 2/step 5), `src/config.ts`
