@@ -2,13 +2,15 @@
 
 **Status**: draft
 **Created**: 2026-09-05
-**Updated**: 2026-09-05
+**Updated**: 2026-09-06
 **Related**: `docs/planning-procedure.md` (wiring point — step 2/step 5), `src/config.ts`
 (`GlobalConfig`/`loadGlobalConfig`, where the new config field lands), `src/jira/client.ts`
 (`JiraClient`, the auth/fetch chokepoint pattern the new Confluence client follows),
 `src/repo-context.ts` (`.ai/intake-mcp.json` — per-repo config, deliberately **not** used here, see
-Key decision #5), `ai-intake-documentation-mcp` (a separate, sibling MCP server for *authoring*
-guides in the correct format — not built, but the guide shape below should anticipate it)
+Key decision #5), `ai-intake-documentation-mcp`'s
+`.ai/plans/draft/2026-09-06-add-confluence-guide-authoring.md` — the companion plan for the
+sibling MCP server that *authors and syncs* guides to the Confluence index this plan reads from
+(drafted alongside this update; see Key decision #7 below for how the two plans share config)
 
 ## Problem
 
@@ -34,8 +36,9 @@ predictable way.
 
 - Raw/unbounded Confluence search or crawling (future capability, separate feature, for tasks that
   can tolerate messier context).
-- `ai-intake-documentation-mcp` (the sibling tool for *authoring* guides in the correct format). Not
-  built now, but the guide shape below should anticipate it.
+- The actual authoring/publishing UI or workflow beyond what `ai-intake-documentation-mcp`'s
+  companion plan (`2026-09-06-add-confluence-guide-authoring.md`) builds — this plan only consumes
+  the index `ai-intake-documentation-mcp` produces, it doesn't dictate how guides get written.
 - Automated feedback loop that rewrites guides from completed-ticket lessons learned. Hook point
   named in Key decision #4, not built.
 
@@ -70,6 +73,8 @@ CONFLUENCE_GUIDE_INDEX_URL=https://confluence.example.com/pages/GUIDE_INDEX
 - Personal use: leave it unset — `loadGlobalConfig()` treats it as optional (unlike
   `JIRA_SITE_URL`), and the agent behaves as it does today.
 - Company use: set it once, in the shared `.env` convention the Jira fields already use.
+- This same file is also where `ai-intake-documentation-mcp`'s guide-authoring/sync tools read and
+  write their own Confluence settings (`CONFLUENCE_SPACE_KEY`, etc.) — see Key decision #7.
 
 ### 3. Retrieval flow (agent-driven, not pre-wired per ticket type)
 
@@ -99,8 +104,7 @@ CONFLUENCE_GUIDE_INDEX_URL=https://confluence.example.com/pages/GUIDE_INDEX
 - **App-specific notes (in-repo)** — quirks, forked bundles, legacy hacks particular to one app.
   Lives with the app, not in Confluence.
 
-## Guide authoring notes (for the future `ai-intake-documentation-mcp` guide-authoring flow, not
-built now)
+## Guide authoring notes (implemented by `ai-intake-documentation-mcp`'s companion plan)
 
 Guides in the index should be written for agent consumption:
 - Atomic, testable steps.
@@ -175,6 +179,18 @@ to confirm, not fully closed**: this holds for a standard shared-tenant setup, b
 Confluence and Jira as genuinely separate instances/credentials would need its own auth config. Flag
 at review rather than blocking on it now — the common case is worth building for directly, and the
 separate-instance case is a config-shape extension, not a rearchitecture.
+
+### 7. `ai-intake-documentation-mcp` shares this same config file for its write-side settings
+
+Decided together with that repo's companion plan (`2026-09-06-add-confluence-guide-authoring.md`):
+rather than a second `~/.config/ai-intake-documentation-mcp/.env`, the guide-authoring tools in
+that sibling MCP server also read/write `~/.config/ai-intake-mcp/.env` — same file this plan's
+`CONFLUENCE_GUIDE_INDEX_URL` lives in. One Confluence configuration for a developer to set up, not
+two, whether they use one of these tools or both. It also means that repo's index-page bootstrap
+tool (`ensure_guide_index`) can write `CONFLUENCE_GUIDE_INDEX_URL` into this file directly once it
+creates the page — a developer who runs that tool first never has to manually copy a URL into this
+config at all. This repo's `loadGlobalConfig()` doesn't need any change for this to work; it's the
+other repo's tooling that points at this path instead of inventing its own.
 
 ## Implementation steps (draft)
 
