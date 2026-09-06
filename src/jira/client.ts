@@ -56,9 +56,20 @@ export class JiraClient {
       );
       return { Authorization: `Basic ${basic}` };
     }
-    // Lazy-imported: cookie mode pulls in keytar/better-sqlite3 (native modules), which token-mode
-    // developers shouldn't need to have installable/loadable on their machine at all.
-    const { getJiraCookieHeader } = await import("./auth-cookie.js");
+    // Lazy-imported: cookie mode pulls in keytar/better-sqlite3 (optionalDependencies, native
+    // modules), which token-mode developers shouldn't need installable/loadable on their machine at
+    // all — set JIRA_INTAKE_API_TOKEN and this import never runs.
+    let getJiraCookieHeader: typeof import("./auth-cookie.js").getJiraCookieHeader;
+    try {
+      ({ getJiraCookieHeader } = await import("./auth-cookie.js"));
+    } catch (err) {
+      throw new Error(
+        `Cookie-based Jira auth (JIRA_INTAKE_API_TOKEN is unset) requires the optional ` +
+          `"better-sqlite3" and "keytar" packages, which aren't installed — run \`npm install\` ` +
+          `again, or set JIRA_INTAKE_API_TOKEN to avoid needing them at all. ` +
+          `Original error: ${(err as Error).message}`,
+      );
+    }
     const cookie = await getJiraCookieHeader(this.config.jiraSiteUrl, this.config.jiraCookieBrowser);
     return { Cookie: cookie, "X-Atlassian-Token": "no-check" };
   }

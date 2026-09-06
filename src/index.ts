@@ -1,10 +1,15 @@
 #!/usr/bin/env node
 import { readFileSync, realpathSync } from "node:fs";
+import { createServer } from "node:http";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
+import {
+  localhostHostValidation,
+  localhostOriginValidation,
+  NodeStreamableHTTPServerTransport,
+} from "@modelcontextprotocol/node";
+import { McpServer, type CallToolResult } from "@modelcontextprotocol/server";
+import { StdioServerTransport } from "@modelcontextprotocol/server/stdio";
 import { z } from "zod";
 import { loadGlobalConfig, type GlobalConfig } from "./config.js";
 import { JiraClient } from "./jira/client.js";
@@ -52,7 +57,7 @@ server.registerTool(
     description:
       "Verifies Jira credentials load, the site is reachable, and the configured in-progress " +
       "and code-review native statuses exist on the board.",
-    inputSchema: {},
+    inputSchema: z.object({}),
     annotations: { readOnlyHint: true, title: "Health check" },
   },
   async () => {
@@ -71,7 +76,7 @@ server.registerTool(
     description:
       "Fetches a Jira ticket (summary, status, description, comments). Refuses if this repo isn't " +
       "configured yet (see write_repo_config) or if the ticket belongs to a different repo.",
-    inputSchema: { key: z.string().describe("Ticket key, e.g. DAV-5") },
+    inputSchema: z.object({ key: z.string().describe("Ticket key, e.g. DAV-5") }),
     annotations: { readOnlyHint: true, title: "Get ticket" },
   },
   async ({ key }) => {
@@ -90,11 +95,11 @@ server.registerTool(
       "Creates a new Jira ticket in this repo's configured project (see write_repo_config), " +
       "bootstrapped with state:plan and this repo's app tag so it's immediately usable by the " +
       "rest of the harness. Refuses if this repo isn't configured yet.",
-    inputSchema: {
+    inputSchema: z.object({
       summary: z.string().describe("Ticket summary/title"),
       description: z.string().optional().describe("Plain text; converted to Jira's document format"),
       issue_type: z.string().optional().describe('Jira issue type name, defaults to "Task"'),
-    },
+    }),
     annotations: { readOnlyHint: false, destructiveHint: false, title: "Create ticket" },
   },
   async ({ summary, description, issue_type: issueType }) => {
@@ -110,7 +115,7 @@ server.registerTool(
   "tracker_add_comment",
   {
     description: "Adds a comment to a Jira ticket, stamped with a footer naming the calling agent.",
-    inputSchema: { key: z.string().describe("Ticket key, e.g. DAV-5"), text: z.string() },
+    inputSchema: z.object({ key: z.string().describe("Ticket key, e.g. DAV-5"), text: z.string() }),
     annotations: { readOnlyHint: false, destructiveHint: false, title: "Add comment" },
   },
   async ({ key, text }) => {
@@ -131,10 +136,10 @@ server.registerTool(
       "Transitions a ticket's abstract state (needs-input, review, working, verify, or problem) " +
       "via its state:* label. state:implement is reachable only via approve_plan, not this tool. " +
       "Assignee-gated: refuses if assigned to someone else, auto-assigns if unassigned.",
-    inputSchema: {
+    inputSchema: z.object({
       key: z.string().describe("Ticket key, e.g. DAV-5"),
       state: z.enum(["needs-input", "review", "working", "verify", "problem"]),
-    },
+    }),
     annotations: { readOnlyHint: false, destructiveHint: false, title: "Transition ticket" },
   },
   async ({ key, state }) => {
@@ -152,7 +157,7 @@ server.registerTool(
     description:
       "Creates (or resumes) a git worktree for a ticket's branch, as a sibling directory of the " +
       "current repo. No DB/container provisioning — pure git.",
-    inputSchema: { ticket_key: z.string().describe("Ticket key, e.g. DAV-5") },
+    inputSchema: z.object({ ticket_key: z.string().describe("Ticket key, e.g. DAV-5") }),
     annotations: { readOnlyHint: false, destructiveHint: false, title: "Create worktree" },
   },
   async ({ ticket_key: ticketKey }) => {
@@ -172,10 +177,10 @@ server.registerTool(
       "Creates or overwrites .ai/intake-mcp.json at the current repo's root, mapping it to one or " +
       "more Jira project keys and an app tag. Called once, automatically, the first time a tracker " +
       "tool is used in an unconfigured repo.",
-    inputSchema: {
+    inputSchema: z.object({
       jira_project_keys: z.array(z.string()).min(1).describe('e.g. ["DAV"] or ["DAV", "OPS"]'),
       app_tag: z.string().describe('e.g. "app:my-repo"'),
-    },
+    }),
     annotations: { readOnlyHint: false, destructiveHint: false, title: "Write repo config" },
   },
   ({ jira_project_keys: jiraProjectKeys, app_tag: appTag }) => {
@@ -194,7 +199,7 @@ server.registerTool(
       "Approves a ticket's plan: transitions it to state:implement (refusing unless it's " +
       "currently state:review) and flips the plan file's Status from draft to ready. The only way " +
       "to reach state:implement — tracker_transition refuses that target directly.",
-    inputSchema: { ticket_key: z.string().describe("Ticket key, e.g. DAV-5") },
+    inputSchema: z.object({ ticket_key: z.string().describe("Ticket key, e.g. DAV-5") }),
     annotations: { readOnlyHint: false, destructiveHint: false, title: "Approve plan" },
   },
   async ({ ticket_key: ticketKey }) => {
@@ -215,7 +220,7 @@ server.registerTool(
       "plus state:implement/working on Jira), and transitions to state:working if this is the " +
       "first run. Hand off to docs://implementation-procedure afterward for the actual " +
       "implementation, build/test/lint, and final tracker_transition to verify or problem.",
-    inputSchema: { ticket_key: z.string().describe("Ticket key, e.g. DAV-5") },
+    inputSchema: z.object({ ticket_key: z.string().describe("Ticket key, e.g. DAV-5") }),
     annotations: { readOnlyHint: false, destructiveHint: false, title: "Start implementation" },
   },
   async ({ ticket_key: ticketKey }) => {
@@ -239,11 +244,11 @@ server.registerTool(
       "Removes a ticket's git worktree and, unless keep_branch is set, its branch. Refuses non-" +
       "feature/* branches and anything not merged into the base branch unless force is set. Pure " +
       "git — no container/DB was ever created for a worktree, so there's nothing else to tear down.",
-    inputSchema: {
+    inputSchema: z.object({
       ticket_key: z.string().describe("Ticket key, e.g. DAV-5"),
       force: z.boolean().optional().describe("Remove even if not merged into the base branch"),
       keep_branch: z.boolean().optional().describe("Remove the worktree but keep the branch"),
-    },
+    }),
     annotations: { readOnlyHint: false, destructiveHint: true, title: "Remove worktree" },
   },
   ({ ticket_key: ticketKey, force, keep_branch: keepBranch }) => {
@@ -297,7 +302,7 @@ server.registerPrompt(
   "plan_ticket",
   {
     description: "Plan a ticket: fetch it, read the planning procedure, create/resume its worktree.",
-    argsSchema: { ticket_key: z.string().describe("Ticket key, e.g. DAV-5") },
+    argsSchema: z.object({ ticket_key: z.string().describe("Ticket key, e.g. DAV-5") }),
   },
   ({ ticket_key: ticketKey }) => ({
     messages: [
@@ -328,7 +333,7 @@ server.registerPrompt(
     description:
       "Implement a ticket's approved plan: resolve/resume its worktree, confirm approval, follow " +
       "the implementation procedure, report back.",
-    argsSchema: { ticket_key: z.string().describe("Ticket key, e.g. DAV-5") },
+    argsSchema: z.object({ ticket_key: z.string().describe("Ticket key, e.g. DAV-5") }),
   },
   ({ ticket_key: ticketKey }) => ({
     messages: [
@@ -360,9 +365,38 @@ server.registerPrompt(
 // only load lazily, inside a tool handler, so listing tools/prompts/resources never touches them.
 export { server };
 
+/**
+ * The MCP_TRANSPORT=http branch's server, factored out (and exported) so a test can bind it to an
+ * ephemeral port and drive it with real HTTP requests — same rationale as exporting `server` above,
+ * but for the loopback/origin validation and request wiring, which is this project's own code, not
+ * SDK-internal (draft plan: http-transport-and-v2-sdk-migration.md, open question #4).
+ */
+export function createHttpServer() {
+  const validateHost = localhostHostValidation();
+  const validateOrigin = localhostOriginValidation();
+  return createServer(async (req, res) => {
+    if (!validateHost(req, res) || !validateOrigin(req, res)) return;
+    const transport = new NodeStreamableHTTPServerTransport({ sessionIdGenerator: undefined });
+    await server.connect(transport);
+    await transport.handleRequest(req, res);
+  });
+}
+
+/**
+ * stdio (default, unchanged) unless MCP_TRANSPORT=http opts a teammate into a long-lived local
+ * instance other clients can point a URL at, instead of each spawning their own stdio process
+ * (draft plan: http-transport-and-v2-sdk-migration.md). Loopback-only and origin-checked — this is
+ * "one teammate runs their own instance," not a network-exposed shared service; credentials are
+ * still read locally by loadGlobalConfig() the same as stdio today.
+ */
 async function main(): Promise<void> {
-  const transport = new StdioServerTransport();
-  await server.connect(transport);
+  if (process.env.MCP_TRANSPORT === "http") {
+    const port = Number(process.env.MCP_HTTP_PORT ?? 3939);
+    createHttpServer().listen(port, "127.0.0.1");
+    console.error(`ai-intake-mcp listening on http://127.0.0.1:${port}/mcp`);
+  } else {
+    await server.connect(new StdioServerTransport());
+  }
 }
 
 // Guards the real stdio connect to only the actual CLI entrypoint (`node .../dist/index.js`, the

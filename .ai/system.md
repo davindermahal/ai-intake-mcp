@@ -2,7 +2,7 @@
 
 ## What this project is
 
-An MCP server (Node 24/TypeScript, `@modelcontextprotocol/sdk`) that lets a developer plan **and
+An MCP server (Node 24/TypeScript, `@modelcontextprotocol/server`) that lets a developer plan **and
 implement** an issue-tracker ticket on demand: sitting inside their own project repo with an
 MCP-capable agent CLI already open, they name a ticket (e.g. `/plan_ticket DAV-4`) and the server +
 agent together fetch the ticket, create or resume a git worktree for it, and guide the agent through

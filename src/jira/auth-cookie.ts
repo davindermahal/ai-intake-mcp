@@ -11,6 +11,11 @@ import keytar from "keytar";
  * not the harness's cross-browser/cross-OS breadth. Extend only if a developer actually needs it.
  *
  * A fresh cookie is extracted on every call, never cached to disk — same contract as the harness.
+ *
+ * `better-sqlite3` and `keytar` are `optionalDependencies` (native modules token-mode users
+ * shouldn't need installable at all). This module's static imports of them are safe because the
+ * whole module is itself loaded lazily — see the `await import("./auth-cookie.js")` in
+ * `JiraClient.authHeaders`, which is the only thing that pulls this file (and its native deps) in.
  */
 
 const PROFILE_DIR: Record<string, string> = {
