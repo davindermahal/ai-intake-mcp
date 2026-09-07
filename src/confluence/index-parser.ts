@@ -3,6 +3,7 @@ export interface GuideIndexEntry {
   description: string;
   link: string;
   tags: string[];
+  lastModified?: string;
 }
 
 /**
@@ -57,7 +58,13 @@ function captureAll(text: string, pattern: RegExp): string[] {
  * Parses the `{title, description, link, tags}` table out of a Confluence page's storage-format
  * body (curated-guide-retrieval.md's index page shape). Hand-rolled against the small, known
  * subset Confluence's storage format actually produces for a simple table — not a general HTML
- * parser. The first row is assumed to be a header (Title | Description | Link | Tags) and skipped.
+ * parser. The first row is assumed to be a header (Title | Description | Link | Tags[ | Last
+ * Modified]) and skipped as data.
+ *
+ * The first four columns stay positional (their contract isn't changing) — only the optional 5th
+ * `Last Modified` column is located by header text, so a legacy 4-column table (no such header at
+ * all) still parses cleanly with `lastModified` `undefined` on every row
+ * (2026-09-07-ai-intake-mcp-read-the-guide-index-s-last-modified-column-2.md Key decision #1).
  */
 export function parseGuideIndex(storageHtml: string): GuideIndexEntry[] {
   const tableMatch = storageHtml.match(/<table[^>]*>([\s\S]*?)<\/table>/i);
@@ -67,8 +74,11 @@ export function parseGuideIndex(storageHtml: string): GuideIndexEntry[] {
   const rows = captureAll(tableBody, /<tr[^>]*>([\s\S]*?)<\/tr>/gi);
   if (rows.length === 0) return [];
 
+  const headerCells = captureAll(rows[0] ?? "", /<t[dh][^>]*>([\s\S]*?)<\/t[dh]>/gi).map(stripTags);
+  const lastModifiedIndex = headerCells.indexOf("Last Modified");
+
   const entries: GuideIndexEntry[] = [];
-  // Skip the header row (first <tr>) — it's Title/Description/Link/Tags column labels, not data.
+  // Skip the header row (first <tr>) — it's column labels, not data.
   for (const row of rows.slice(1)) {
     const cells = captureAll(row, /<t[dh][^>]*>([\s\S]*?)<\/t[dh]>/gi);
     const [titleCell, descriptionCell, linkCell, tagsCell] = cells;
@@ -83,9 +93,11 @@ export function parseGuideIndex(storageHtml: string): GuideIndexEntry[] {
       .split(",")
       .map((t) => t.trim())
       .filter((t) => t.length > 0);
+    const lastModifiedCell = lastModifiedIndex >= 0 ? cells[lastModifiedIndex] : undefined;
+    const lastModified = lastModifiedCell !== undefined ? stripTags(lastModifiedCell) || undefined : undefined;
 
     if (!title) continue;
-    entries.push({ title, description, link, tags });
+    entries.push({ title, description, link, tags, lastModified });
   }
   return entries;
 }

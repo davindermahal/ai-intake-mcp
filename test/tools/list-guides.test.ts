@@ -64,6 +64,45 @@ describe("listGuides", () => {
     expect(result.guides[0]).not.toHaveProperty("link");
   });
 
+  it("passes lastModified through from the catalog, defined and undefined", async () => {
+    const configured: GlobalConfig = {
+      ...baseConfig,
+      confluenceGuideIndexUrl: "https://example.atlassian.net/wiki/spaces/ENG/pages/999/Guides",
+    };
+    const response = {
+      ...INDEX_PAGE_RESPONSE,
+      body: {
+        storage: {
+          representation: "storage" as const,
+          value: `<table><tbody>
+            <tr><th>Title</th><th>Description</th><th>Link</th><th>Tags</th><th>Last Modified</th></tr>
+            <tr>
+              <td><p>Symfony 4→5 Upgrade</p></td>
+              <td><p>Steps for 4.4→5.x</p></td>
+              <td><p><a href="https://example.atlassian.net/wiki/spaces/ENG/pages/111/S">l</a></p></td>
+              <td><p>symfony, upgrade</p></td>
+              <td><p>2026-09-06</p></td>
+            </tr>
+            <tr>
+              <td><p>Company Conventions</p></td>
+              <td><p>Coding standards</p></td>
+              <td><p><a href="https://example.atlassian.net/wiki/spaces/ENG/pages/222/C">l</a></p></td>
+              <td><p>always</p></td>
+              <td><p></p></td>
+            </tr>
+          </tbody></table>`,
+        },
+      },
+    };
+    const fetchImpl = vi.fn(async () => new Response(JSON.stringify(response), { status: 200 }));
+    const client = new ConfluenceClient({ config: configured, fetchImpl });
+
+    const result = await listGuides(client, configured);
+    expect(result.guides).toHaveLength(2);
+    expect(result.guides[0].lastModified).toBe("2026-09-06");
+    expect(result.guides[1].lastModified).toBeUndefined();
+  });
+
   it("only fetches the index page once across repeated calls in the same process", async () => {
     const configured: GlobalConfig = {
       ...baseConfig,

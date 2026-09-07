@@ -1,9 +1,14 @@
 # Plan: `ai-intake-mcp` — read the guide index's Last Modified column
 
-**Status**: draft
+**Status**: active — all 5 Implementation order steps done, write-side contract re-confirmed (no
+drift), full suite green (`npm test`: 376 passed, 3 skipped, 0 failed; `npm run build`/`npm run
+lint` clean). **Not yet moved to `completed/`**: QA Plan's real-system check is blocked on the
+companion write-side plan, still `status: draft` in `ai-intake-documentation-mcp` as of 2026-09-07
+— no real 5-column Confluence page exists yet to verify against. Revisit once that plan ships and
+runs its own live dry run.
 **Branch**: task/guide-index-last-mod-column
 **Created**: 2026-09-06
-**Updated**: 2026-09-06
+**Updated**: 2026-09-07
 **Related**: `.ai/plans/completed/curated-guide-retrieval.md` (this repo's own guide-retrieval plan —
 now **complete**: all 7 Implementation steps done, real-Confluence QA passed, Verdict: GO. It's in
 `completed/` now, and per `.ai/README.md`'s convention that directory's files are "never edited
@@ -96,42 +101,26 @@ planning agent has a staleness signal for a matched guide. This repo never write
    plan (written while the base plan was still `active/`) included a step to edit that table directly;
    corrected once the base plan completed and moved.
 
-## Implementation order
+## Implementation order (all done)
 
-1. **Re-confirm the write-side contract.** Before writing any code, read the companion write-side
-   plan at the path under **Related** above and confirm its column name, position, and date format
-   still exactly match the Column contract in this plan's Scope section. Acceptance check: the three
-   values match; if any have drifted, stop and update this plan's Column contract first rather than
-   implementing against a stale assumption (see Boundaries).
-2. **Test step — `index-parser.ts` fixtures.** In `test/confluence/index-parser.test.ts`, add:
-   - A 5-column fixture whose header row includes `<th><p>Last Modified</p></th>` and whose data rows
-     each end with `<td><p>YYYY-MM-DD</p></td>`; assert the parsed entries include `lastModified` equal
-     to that exact string.
-   - A 5-column fixture with an empty `Last Modified` cell (`<td><p></p></td>`) on one row; assert that
-     row's `lastModified` is `undefined`.
-   - The existing legacy 4-column fixture (already in the file, no `Last Modified` header at all);
-     assert `lastModified` is `undefined` on every row and parsing doesn't throw.
-   Acceptance check: `make test` — the new "has a value" case fails (red), because
-   `parseGuideIndex` doesn't read a 5th column yet.
-3. **Implementation step — `index-parser.ts` parsing.** In `src/confluence/index-parser.ts`: add
-   `lastModified?: string` to the `GuideIndexEntry` interface; from the header row's cells (already
-   captured via `captureAll` on `rows[0]`), compute `headerCells.map(stripTags)` and
-   `indexOf("Last Modified")`; in the per-row loop, if that index exists, read `cells[thatIndex]`
-   through `stripTags`, and set `lastModified` to that value or `undefined` if it strips to an empty
-   string; if the index doesn't exist, `lastModified` is always `undefined`. Acceptance check:
-   `make test` — all three Step 2 cases pass, and the full suite (`make test`) is still green (no
-   regression in the pre-existing 4-column tests already in that file).
-4. **Test step — `list-guides.ts` pass-through.** In `test/tools/list-guides.test.ts`, add a case
-   (using the same catalog-stubbing pattern the existing tests in that file already use) asserting that
-   when a catalog entry has `lastModified: "2026-09-06"`, `listGuides()`'s returned `guides[]` entry
-   includes `lastModified: "2026-09-06"`; and that an entry with `lastModified: undefined` comes back
-   with `lastModified: undefined`. Acceptance check: `make test` — this new case fails (red), because
-   `ListGuidesResult`'s mapping doesn't include `lastModified` yet.
-5. **Implementation step — `list-guides.ts` pass-through.** In `src/tools/list-guides.ts`, add
-   `lastModified` to `ListGuidesResult`'s guide type and to the `.map()` call
-   (`catalog.map(({ title, description, tags, lastModified }) => ({ title, description, tags,
-   lastModified }))`). Acceptance check: `make test` — Step 4's case passes, and the full suite is
-   green.
+1. **Done.** Re-read the companion write-side plan
+   (`ai-intake-documentation-mcp`'s `.ai/plans/draft/2026-09-07-add-a-last-modified-column-to-the-guide-index-write-side.md`).
+   Column name (`Last Modified`), position (5th, after `Tags`), and date format (`YYYY-MM-DD`) all
+   matched this plan's Column contract exactly — no drift, proceeded as planned.
+2. **Done.** Added the three fixtures to `test/confluence/index-parser.test.ts`: a 5-column fixture
+   with a real date value, a 5-column fixture with an empty `Last Modified` cell, and an assertion on
+   the existing legacy 4-column fixture. Confirmed red first: the "has a value" case failed with
+   `expected undefined to be '2026-09-06'` (the other two passed trivially, since an absent field is
+   already `undefined`) — exactly the expected red state.
+3. **Done.** `src/confluence/index-parser.ts`: added `lastModified?: string` to `GuideIndexEntry`;
+   `parseGuideIndex` now reads the header row's cells via `captureAll`/`stripTags`, finds
+   `indexOf("Last Modified")`, and reads that column per row (`undefined` if the header is absent or
+   the cell strips to empty). All 7 tests in that file passed after, full suite green.
+4. **Done.** Added a case to `test/tools/list-guides.test.ts` covering both a `lastModified` value
+   passing through and an entry with no `Last Modified` cell coming back `undefined`. Confirmed red
+   first: `expected undefined to be '2026-09-06'`.
+5. **Done.** `src/tools/list-guides.ts`: added `lastModified?: string` to `ListGuidesResult`'s guide
+   type and to the `.map()` projection. All 4 tests in that file passed after, full suite green.
 
 ## Testing strategy
 
@@ -189,7 +178,8 @@ None.
 
 ## Confirm at Review
 
-- [ ] Header-match lookup for `Last Modified` only, keeping the first four columns positional (Key
-      decision #1) — recommended: yes, per the reasoning given there.
-- [ ] An empty `Last Modified` cell maps to `lastModified: undefined`, never `""` — recommended: yes,
-      matches "treated as unknown" in Scope.
+- [x] Header-match lookup for `Last Modified` only, keeping the first four columns positional (Key
+      decision #1) — implemented exactly this way; confirmed by
+      `test/confluence/index-parser.test.ts`'s legacy-4-column and 5-column fixtures.
+- [x] An empty `Last Modified` cell maps to `lastModified: undefined`, never `""` — implemented
+      exactly this way; confirmed by the "maps an empty Last Modified cell to undefined" test.

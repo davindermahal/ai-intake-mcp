@@ -45,6 +45,47 @@ describe("parseGuideIndex", () => {
     });
   });
 
+  it("leaves lastModified undefined on a legacy 4-column table (no Last Modified header at all)", () => {
+    const entries = parseGuideIndex(STORAGE_FIXTURE);
+    expect(entries).toHaveLength(2);
+    expect(entries[0].lastModified).toBeUndefined();
+    expect(entries[1].lastModified).toBeUndefined();
+  });
+
+  it("parses a 5th Last Modified column by header text into lastModified", () => {
+    const storage = `
+      <table><tbody>
+        <tr><th><p>Title</p></th><th><p>Description</p></th><th><p>Link</p></th><th><p>Tags</p></th><th><p>Last Modified</p></th></tr>
+        <tr>
+          <td><p>Symfony 4→5 Upgrade</p></td>
+          <td><p>Steps for upgrading 4.4 apps to 5.x</p></td>
+          <td><p><a href="https://x/pages/1/y">link</a></p></td>
+          <td><p>symfony, upgrade</p></td>
+          <td><p>2026-09-06</p></td>
+        </tr>
+      </tbody></table>`;
+    const entries = parseGuideIndex(storage);
+    expect(entries).toHaveLength(1);
+    expect(entries[0].lastModified).toBe("2026-09-06");
+  });
+
+  it("maps an empty Last Modified cell to undefined, not an error and not an empty string", () => {
+    const storage = `
+      <table><tbody>
+        <tr><th><p>Title</p></th><th><p>Description</p></th><th><p>Link</p></th><th><p>Tags</p></th><th><p>Last Modified</p></th></tr>
+        <tr>
+          <td><p>Company Conventions</p></td>
+          <td><p>Coding standards, PR process, testing expectations</p></td>
+          <td><p><a href="https://x/pages/2/y">link</a></p></td>
+          <td><p>always</p></td>
+          <td><p></p></td>
+        </tr>
+      </tbody></table>`;
+    const entries = parseGuideIndex(storage);
+    expect(entries).toHaveLength(1);
+    expect(entries[0].lastModified).toBeUndefined();
+  });
+
   it("returns an empty array when the page has no table", () => {
     expect(parseGuideIndex("<p>Nothing here yet.</p>")).toEqual([]);
   });

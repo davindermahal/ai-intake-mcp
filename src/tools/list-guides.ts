@@ -4,7 +4,7 @@ import { getGuideCatalog } from "../confluence/guide-catalog.js";
 
 export interface ListGuidesResult {
   configured: boolean;
-  guides: { title: string; description: string; tags: string[] }[];
+  guides: { title: string; description: string; tags: string[]; lastModified?: string }[];
 }
 
 /**
@@ -20,6 +20,6 @@ export async function listGuides(client: ConfluenceClient, config: GlobalConfig)
   const catalog = await getGuideCatalog(client, config.confluenceGuideIndexUrl);
   return {
     configured: true,
-    guides: catalog.map(({ title, description, tags }) => ({ title, description, tags })),
+    guides: catalog.map(({ title, description, tags, lastModified }) => ({ title, description, tags, lastModified })),
   };
 }
