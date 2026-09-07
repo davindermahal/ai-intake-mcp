@@ -8,9 +8,11 @@
 (`JiraClient`, the auth/fetch chokepoint pattern the new Confluence client follows),
 `src/repo-context.ts` (`.ai/intake-mcp.json` — per-repo config, deliberately **not** used here, see
 Key decision #5), `ai-intake-documentation-mcp`'s
-`.ai/plans/draft/2026-09-06-add-confluence-guide-authoring.md` — the companion plan for the
+`.ai/plans/active/2026-09-06-add-confluence-guide-authoring.md` — the companion plan for the
 sibling MCP server that *authors and syncs* guides to the Confluence index this plan reads from
-(drafted alongside this update; see Key decision #7 below for how the two plans share config)
+(see Key decision #7 below for how the two plans share config), and that same repo's
+`.ai/plans/active/2026-09-06-confluence-guide-qa-dry-run.md` — the detailed manual QA plan
+covering both repos end to end against a real Confluence instance, not yet run
 
 ## Problem
 
@@ -181,8 +183,8 @@ Jira ones only when set:
 
 ```
 CONFLUENCE_SITE_URL=   # falls back to JIRA_SITE_URL if unset
-CONFLUENCE_EMAIL=      # falls back to JIRA_EMAIL if unset
-CONFLUENCE_API_TOKEN=  # falls back to JIRA_API_TOKEN if unset
+CONFLUENCE_EMAIL=      # falls back to JIRA_INTAKE_EMAIL if unset
+CONFLUENCE_API_TOKEN=  # falls back to JIRA_INTAKE_API_TOKEN if unset
 ```
 
 `src/confluence/client.ts` (sibling to `src/jira/client.ts`, same `JiraClientOptions`-style shape —

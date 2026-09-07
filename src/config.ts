@@ -9,6 +9,20 @@ export interface GlobalConfig {
   trackerNativeStatusInProgress: string;
   trackerNativeStatusCodeReview: string;
   jiraCookieBrowser: string;
+  /**
+   * Confluence guide index page URL (curated-guide-retrieval.md). Unset = feature fully off.
+   * Optional (unlike the `jira*` fields above) so every pre-existing `GlobalConfig` test fixture
+   * in this repo doesn't need updating for a feature they don't exercise.
+   */
+  confluenceGuideIndexUrl?: string;
+  /**
+   * Confluence auth overrides (curated-guide-retrieval.md Key decision #6) — each falls back to
+   * the matching Jira field when unset, on the assumption Confluence and Jira share one Atlassian
+   * tenant. Set any of these individually if that assumption turns out wrong.
+   */
+  confluenceSiteUrl?: string;
+  confluenceEmail?: string;
+  confluenceApiToken?: string;
 }
 
 const CONFIG_DIR = join(homedir(), ".config", "ai-intake-mcp");
@@ -74,5 +88,9 @@ export function loadGlobalConfig(): GlobalConfig {
     trackerNativeStatusInProgress: get("TRACKER_NATIVE_STATUS_IN_PROGRESS") ?? "In Progress",
     trackerNativeStatusCodeReview: get("TRACKER_NATIVE_STATUS_CODE_REVIEW") ?? "Code Review",
     jiraCookieBrowser: get("JIRA_COOKIE_BROWSER") ?? "chrome",
+    confluenceGuideIndexUrl: get("CONFLUENCE_GUIDE_INDEX_URL") || undefined,
+    confluenceSiteUrl: get("CONFLUENCE_SITE_URL") || undefined,
+    confluenceEmail: get("CONFLUENCE_EMAIL") || undefined,
+    confluenceApiToken: get("CONFLUENCE_API_TOKEN") || undefined,
   };
 }
