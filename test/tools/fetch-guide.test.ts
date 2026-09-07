@@ -38,8 +38,16 @@ const GUIDE_PAGE_RESPONSE = {
   title: "Symfony 4→5 Upgrade",
   body: {
     storage: {
+      // Real shape documentation-mcp's markdownToStorage produces for a fenced code block --
+      // not a plain <code> tag. A prior version of this fixture used <code> directly, which never
+      // exercised the CDATA-swallowing bug found live against a real Confluence page (see
+      // storage-text.test.ts).
       representation: "storage" as const,
-      value: "<h1>Step 1</h1><p>Run <code>composer require symfony/symfony:^5.0</code></p>",
+      value:
+        "<h1>Step 1</h1><p>Run:</p>" +
+        '<ac:structured-macro ac:name="code"><ac:parameter ac:name="language">none</ac:parameter>' +
+        "<ac:plain-text-body><![CDATA[composer require symfony/symfony:^5.0]]></ac:plain-text-body>" +
+        "</ac:structured-macro>",
     },
   },
 };
@@ -78,5 +86,6 @@ describe("fetchGuide", () => {
     expect(result.content).toContain("Step 1");
     expect(result.content).toContain("composer require symfony/symfony:^5.0");
     expect(result.content).not.toContain("<h1>");
+    expect(result.content).not.toMatch(/^none$|\nnone\n/);
   });
 });

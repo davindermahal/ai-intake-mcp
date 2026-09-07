@@ -49,6 +49,28 @@ describe("parseGuideIndex", () => {
     expect(parseGuideIndex("<p>Nothing here yet.</p>")).toEqual([]);
   });
 
+  it("decodes named/numeric HTML entities Confluence introduces on save (found live, real Cloud instance)", () => {
+    const storage = `
+      <table><tbody>
+        <tr><th>Title</th><th>Description</th><th>Link</th><th>Tags</th></tr>
+        <tr>
+          <td><p>Symfony 4&rarr;5 Upgrade</p></td>
+          <td><p>An em&mdash;dash &amp; a numeric ref: &#8594;</p></td>
+          <td><p><a href="https://x/pages/1/y">link</a></p></td>
+          <td><p>symfony</p></td>
+        </tr>
+      </tbody></table>`;
+    const entries = parseGuideIndex(storage);
+    expect(entries).toEqual([
+      {
+        title: "Symfony 4→5 Upgrade",
+        description: "An em—dash & a numeric ref: →",
+        link: "https://x/pages/1/y",
+        tags: ["symfony"],
+      },
+    ]);
+  });
+
   it("skips a malformed row with fewer than 4 cells", () => {
     const malformed = `
       <table><tbody>

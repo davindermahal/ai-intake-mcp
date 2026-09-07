@@ -5,15 +5,36 @@ export interface GuideIndexEntry {
   tags: string[];
 }
 
+/**
+ * Confluence's storage format doesn't just escape XML metacharacters -- it also autoformats plain
+ * Unicode typographic characters (an arrow typed as "->") into named HTML entities on save,
+ * confirmed live against a real Confluence Cloud page (documentation-mcp's sync_guide produced
+ * "Symfony 4→5 Upgrade"; Confluence stored it as "Symfony 4&rarr;5 Upgrade"). This must decode the
+ * same entity set documentation-mcp's index-table.ts does, or the two parsers disagree on a real
+ * page despite agreeing on every mocked test fixture.
+ */
 function stripTags(html: string): string {
   return html
     .replace(/<[^>]*>/g, "")
-    .replace(/&amp;/g, "&")
+    .replace(/&#x([0-9a-fA-F]+);/g, (_, hex: string) => String.fromCodePoint(parseInt(hex, 16)))
+    .replace(/&#(\d+);/g, (_, dec: string) => String.fromCodePoint(parseInt(dec, 10)))
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">")
     .replace(/&quot;/g, '"')
     .replace(/&#39;/g, "'")
+    .replace(/&apos;/g, "'")
     .replace(/&nbsp;/g, " ")
+    .replace(/&rarr;/g, "→")
+    .replace(/&larr;/g, "←")
+    .replace(/&harr;/g, "↔")
+    .replace(/&mdash;/g, "—")
+    .replace(/&ndash;/g, "–")
+    .replace(/&hellip;/g, "…")
+    .replace(/&lsquo;/g, "‘")
+    .replace(/&rsquo;/g, "’")
+    .replace(/&ldquo;/g, "“")
+    .replace(/&rdquo;/g, "”")
+    .replace(/&amp;/g, "&")
     .trim();
 }
 
