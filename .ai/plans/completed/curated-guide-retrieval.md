@@ -1,9 +1,13 @@
-# Plan (draft): `ai-intake-mcp` — curated Confluence guide retrieval
+# Plan (complete): `ai-intake-mcp` — curated Confluence guide retrieval
 
-**Status**: active
+**Status**: complete — all 7 Implementation steps done, full suite green (`npm test`: 372/372 passed
+3 skipped; `npm run build`/`npm run lint` clean), and validated against a real Confluence Cloud
+instance + real Jira ticket by the companion QA dry-run below — **Verdict: GO**, 3 real bugs found
+live and fixed (see "Real-system verification" under Verification below).
 **Created**: 2026-09-05
 **Updated**: 2026-09-06
-**Related**: `docs/planning-procedure.md` (wiring point — step 2/step 5), `src/config.ts`
+**Related**: `docs/planning-procedure.md` (wiring point — step 2/step 5), `docs/implementation-procedure.md`
+(§2 — `.ai/intake-mcp.md` as the app-specific-notes convention, Implementation step 7), `src/config.ts`
 (`GlobalConfig`/`loadGlobalConfig`, where the new config field lands), `src/jira/client.ts`
 (`JiraClient`, the auth/fetch chokepoint pattern the new Confluence client follows),
 `src/repo-context.ts` (`.ai/intake-mcp.json` — per-repo config, deliberately **not** used here, see
@@ -11,8 +15,9 @@ Key decision #5), `ai-intake-documentation-mcp`'s
 `.ai/plans/active/2026-09-06-add-confluence-guide-authoring.md` — the companion plan for the
 sibling MCP server that *authors and syncs* guides to the Confluence index this plan reads from
 (see Key decision #7 below for how the two plans share config), and that same repo's
-`.ai/plans/active/2026-09-06-confluence-guide-qa-dry-run.md` — the detailed manual QA plan
-covering both repos end to end against a real Confluence instance, not yet run
+`.ai/plans/completed/2026-09-06-confluence-guide-qa-dry-run.md` — the detailed manual QA plan
+covering both repos end to end against a real Confluence instance, **run 2026-09-06/07, Verdict:
+GO** (moved to that repo's `completed/` by whoever ran it)
 
 ## Problem
 
@@ -60,8 +65,10 @@ A single, hand-maintained Confluence page lists all agent-consumable guides in a
 - `tags` distinguishes `always`-relevant docs (near-mandatory context, e.g. conventions) from
   `search_only` docs the agent should only fetch when a ticket clearly matches.
 - Index links are **leaf content only** — see Key decision #1 (no child-page recursion).
-- Curation/staleness risk is accepted as a tradeoff for control. Consider a "last reviewed" column
-  later.
+- Curation/staleness risk is accepted as a tradeoff for control. A "last reviewed" column is now
+  planned separately: `.ai/plans/draft/2026-09-07-ai-intake-mcp-read-the-guide-index-s-last-modified-column-2.md`
+  (read side — amends this table to a 5th `Last Modified` column) and its companion write-side plan
+  in `ai-intake-documentation-mcp`.
 
 ### 2. Config
 
@@ -207,20 +214,58 @@ creates the page — a developer who runs that tool first never has to manually 
 config at all. This repo's `loadGlobalConfig()` doesn't need any change for this to work; it's the
 other repo's tooling that points at this path instead of inventing its own.
 
-## Implementation steps (draft)
+## Implementation steps (all done)
 
-1. Add `CONFLUENCE_GUIDE_INDEX_URL`, `CONFLUENCE_SITE_URL`, `CONFLUENCE_EMAIL`, and
-   `CONFLUENCE_API_TOKEN` (all optional) to `GlobalConfig`/`loadGlobalConfig` in `src/config.ts`.
-2. Build `src/confluence/client.ts` (auth/fetch, following `src/jira/client.ts`'s pattern per Key
-   decision #6) and `src/confluence/index-parser.ts` (parse the index page's table into
-   `{title, description, link, tags}[]`).
-3. Add `src/tools/list-guides.ts` — exposes the parsed catalog (titles/descriptions/tags only, not
-   full content), fetched once per process and held in memory (Key decision #3).
-4. Add `src/tools/fetch-guide.ts` — fetches full content, scoped to only links present in the
+1. **Done.** `CONFLUENCE_GUIDE_INDEX_URL`, `CONFLUENCE_SITE_URL`, `CONFLUENCE_EMAIL`, and
+   `CONFLUENCE_API_TOKEN` (all optional) added to `GlobalConfig`/`loadGlobalConfig` in
+   `src/config.ts`.
+2. **Done.** `src/confluence/client.ts` (auth/fetch, following `src/jira/client.ts`'s pattern per
+   Key decision #6) and `src/confluence/index-parser.ts` (parses the index page's table into
+   `{title, description, link, tags}[]`) built, plus `src/confluence/guide-catalog.ts`
+   (per-process memoized fetch, Key decision #3) and `src/confluence/storage-text.ts`.
+3. **Done.** `src/tools/list-guides.ts` exposes the parsed catalog (titles/descriptions/tags only,
+   not full content), fetched once per process and held in memory (Key decision #3).
+4. **Done.** `src/tools/fetch-guide.ts` fetches full content, scoped to only links present in the
    parsed index (enforces the "no raw search" boundary here, in code, not by instruction alone).
-5. Update `docs/planning-procedure.md`: wire guide lookup into §2–§3 (agent checks `always`-tagged
-   docs + searches catalog based on ticket content), add the `**Guides used**:` plan-file line and
-   the ticket-comment instruction from Key decision #2.
-6. Validate end-to-end against the Symfony 4→5 guide as the first real case.
-7. Write up the app-specific-notes convention (in-repo doc location/format) so it's consistent
-   across apps.
+5. **Done.** `docs/planning-procedure.md` §1 gained a "Check for a relevant guide" subsection (agent
+   checks `always`-tagged docs + searches catalog based on ticket content), the "Plan file shape"
+   section gained the `**Guides used**:` line, and §5's summary-comment instruction gained the
+   "name the guide(s) consulted" line — both from Key decision #2.
+6. **Done — real-system validated.** See "Real-system verification" under Verification below;
+   Verdict: **GO**.
+7. **Done.** The app-specific-notes convention reuses the existing `.ai/intake-mcp.md` mechanism
+   (Key decision #5's sibling — already this project's free-form per-repo notes file) rather than
+   inventing a new file: `docs/implementation-procedure.md` §2 now explicitly names app-specific
+   quirks (forked bundles, legacy hacks, guide-step deviations) alongside the dev-setup notes it
+   already described there, and `docs/planning-procedure.md`'s "Check for a relevant guide"
+   subsection gained a "Reconcile against app-specific notes" bullet telling the planning agent to
+   check `.ai/intake-mcp.md` when a guide is fetched. No new file, tool, or schema — same "reuse
+   existing mechanisms" precedent as Key decision #2.
+
+## Verification
+
+- **Automated**: `npm test` — 372 passed, 3 skipped, 0 failed. `npm run build` (tsc) and
+  `npm run lint` (eslint) both clean. Confirmed 2026-09-06 after Implementation step 7 landed.
+- **Real-system verification (Implementation step 6)**: run against a real Confluence Cloud space
+  (`dmahal.atlassian.net`, space `QT`) and a real Jira ticket (DAV-28), documented in
+  `ai-intake-documentation-mcp`'s `.ai/plans/completed/2026-09-06-confluence-guide-qa-dry-run.md`.
+  **Verdict: GO.** Found and fixed 3 real bugs none of the 372 (this repo) + 85 (companion repo)
+  unit tests or code review caught:
+  1. `documentation-mcp`'s Confluence client rejected a bare-domain `JIRA_SITE_URL` (fixed in that
+     repo, not this one).
+  2. Entity decoding — Confluence auto-converts typographic Unicode (e.g. "→") to named HTML
+     entities on save; neither repo's parser decoded beyond `&amp;`/`&lt;`/`&gt;`. Fixed here in
+     `src/confluence/index-parser.ts`'s `stripTags`, commit `a2e57ea`.
+  3. `src/confluence/storage-text.ts`'s tag-strip regex didn't understand `<![CDATA[...]]>` and
+     matched through to the `]]>`'s own `>`, silently deleting every real command from a fetched
+     guide. Zero test coverage before the fix (the one existing test fixture used plain `<code>`,
+     not Confluence's real `ac:structured-macro`/CDATA shape). Fixed, commit `a2e57ea`, with new
+     regression coverage.
+  All 6 phases (config smoke test, first publish, update path, read-side round trip, full
+  planning-procedure integration, auth-fallback) passed after the fixes — see that file for the
+  full phase-by-phase log.
+  - **One caveat carried forward, not blocking**: the published guide page's rendering was only
+    confirmed programmatically (via the API), never visually inspected in the Confluence UI by a
+    human. Worth a quick look next time someone is in that space, but doesn't block this plan —
+    every functional check (parsing, entity/CDATA correctness, the full ticket→plan flow) already
+    passed against the real API response.

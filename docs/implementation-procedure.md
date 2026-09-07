@@ -61,10 +61,14 @@ conventions, domain docs — this repo's own `.ai/system.md`/`.ai/repo-map.md` f
 itself, or the consumer project's equivalents) before changing code.
 
 **Read `.ai/intake-mcp.md` if it exists** — free-form project-specific implementation notes (which
-of the standard `make` targets below this project actually defines, dev-setup quirks). **If it
-doesn't exist yet**, ask the developer once for the essentials — which of `install`/`build`/`test`/
-`lint`/`exec` this project's Makefile defines, and anything unusual about the dev setup — and write
-the file yourself (plain prose, no schema) so nobody has to answer this again.
+of the standard `make` targets below this project actually defines, dev-setup quirks, and
+**app-specific quirks**: forked bundles, legacy hacks, or anything else that means a step from a
+fetched Confluence guide (`docs://planning-procedure`'s "Check for a relevant guide") needs
+adjusting for this particular app — the guide is written for the general case, this file is the
+one place a deviation for this one app gets recorded). **If it doesn't exist yet**, ask the
+developer once for the essentials — which of `install`/`build`/`test`/`lint`/`exec` this project's
+Makefile defines, and anything unusual about the dev setup — and write the file yourself (plain
+prose, no schema) so nobody has to answer this again.
 
 Set the plan's `**Status**:` to `active` and bump `**Updated**:`.
 

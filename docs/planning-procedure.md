@@ -32,6 +32,12 @@ behavior, unchanged. Otherwise:
   there is no such tool, by design.
 - A fetched guide's steps inform the plan you write in step 2, especially `## Implementation
   order` and `## Key decisions` — treat it as prescriptive, not merely background reading.
+- **Reconcile against app-specific notes.** A guide is written for the general case (curated for
+  reuse across apps); this one app may have forked bundles, legacy hacks, or other quirks that mean
+  a step needs adjusting here. Check `.ai/intake-mcp.md` (this project's own free-form notes file,
+  `docs://implementation-procedure` §2) if it exists — that's the one place those deviations are
+  recorded, in-repo, not in Confluence. If it doesn't exist yet, don't create it during planning;
+  that's `docs://implementation-procedure`'s job once implementation starts.
 
 ## 2. Find or create the plan file
 
