@@ -1,25 +1,26 @@
 # Plan: `ai-intake-mcp` — read the guide index's Last Modified column
 
-**Status**: active — all 5 Implementation order steps done, write-side contract re-confirmed (no
+**Status**: complete — all 5 Implementation order steps done, write-side contract re-confirmed (no
 drift), full suite green (`npm test`: 376 passed, 3 skipped, 0 failed; `npm run build`/`npm run
-lint` clean). **Not yet moved to `completed/`**: QA Plan's real-system check is blocked on the
-companion write-side plan, still `status: draft` in `ai-intake-documentation-mcp` as of 2026-09-07
-— no real 5-column Confluence page exists yet to verify against. Revisit once that plan ships and
-runs its own live dry run.
+lint` clean), and QA Plan's real-system round-trip check passed against the live Confluence index
+— see "Real-system verification" under QA Plan below.
 **Branch**: task/guide-index-last-mod-column
 **Created**: 2026-09-06
 **Updated**: 2026-09-07
 **Related**: `.ai/plans/completed/curated-guide-retrieval.md` (this repo's own guide-retrieval plan —
-now **complete**: all 7 Implementation steps done, real-Confluence QA passed, Verdict: GO. It's in
+**complete**: all 7 Implementation steps done, real-Confluence QA passed, Verdict: GO. It's in
 `completed/` now, and per `.ai/README.md`'s convention that directory's files are "never edited
 again, only superseded by a new plan" — so this plan does **not** edit its table; this plan's own
 Design overview below is the up-to-date spec for the index shape, and the "Curation/staleness"
 bullet in `curated-guide-retrieval.md`'s Design overview §1 already points forward to this plan),
 companion write-side plan in the sibling repo, `ai-intake-documentation-mcp`'s
-`.ai/plans/draft/2026-09-07-add-a-last-modified-column-to-the-guide-index-write-side.md` (produces the
-column this plan reads — **the two plans must stay in exact agreement** on column name, position, and
-date format; treat either one drifting from the other as a bug in this plan, not a detail to
-improvise past)
+`.ai/plans/completed/2026-09-07-add-a-last-modified-column-to-the-guide-index-write-side.md`
+(produces the column this plan reads — merged to that repo's `main` via PR #3, **Verdict: GO**,
+real dry run against the live `QT` space; one implementation-strategy deviation noted there —
+their `parseIndexTable` reads the 5th column positionally-with-tolerance rather than by header
+text — but the on-wire contract this plan depends on, header text/position/format, is unaffected.
+That plan explicitly left its own "Verification #3" — this repo's round-trip check — for this plan
+to close; done, see QA Plan below)
 
 ## Goal
 
@@ -139,18 +140,38 @@ the `Makefile` — same command the rest of the suite already uses). Per Impleme
 
 Testing strategy above proves the parsing and pass-through logic against fixture HTML — it cannot
 prove this repo's independently-built parser agrees with the real page `ai-intake-documentation-mcp`'s
-`sync_guide` actually produces once the companion write-side plan ships. Manual verification, once
-that companion plan has run its own live dry run (migrating the real guide index Confluence page):
+`sync_guide` actually produces. Manual verification below, done.
 
-1. From a session with this MCP server connected and `CONFLUENCE_GUIDE_INDEX_URL` configured, call the
-   `list_guides` tool and inspect the raw response.
-2. Confirm at least one returned guide includes a `lastModified` field in `YYYY-MM-DD` shape, and that
-   the value matches what's visibly shown in the `Last Modified` column on the real Confluence index
-   page for that same row (open the page in a browser and compare by eye).
-3. Specifically check for an off-by-one date bug: a page cell showing e.g. `2026-09-06` must come back
-   as exactly `"2026-09-06"` in the tool response — not the day before or after. Key decision #3 (never
-   constructing a `Date` object from this value) should make this class of bug structurally impossible,
-   but this step verifies that in practice, against a real value, not just in theory.
+### Real-system verification (2026-09-07) — PASSED
+
+The write-side plan's own real dry run (see **Related** above) left a live artifact: the shared
+`QT` space's index page (`dmahal.atlassian.net`, page id 196804) is genuinely 5 columns now, with
+one row re-synced (stamped) and one row untouched since before the migration — exactly the mixed
+state this plan's Column contract needs to prove itself against.
+
+1. **Done.** Called the real `list_guides` tool (this MCP server connected, `CONFLUENCE_GUIDE_INDEX_URL`
+   configured) and inspected the raw response:
+   ```json
+   {"configured":true,"guides":[
+     {"title":"Symfony 4→5 Upgrade","description":"...","tags":["symfony","upgrade"]},
+     {"title":"QA Test: Attachment and Last Modified","description":"...","tags":["qa-test"],
+      "lastModified":"2026-09-07"}
+   ]}
+   ```
+2. **Done, both halves.** The re-synced row ("QA Test: Attachment and Last Modified") came back with
+   `lastModified: "2026-09-07"`, in `YYYY-MM-DD` shape, matching the exact date the write side's own
+   Real run log independently confirmed it stamped on that same row via a direct Confluence API check
+   — the two independently-built parsers agree on the real page, not just on matching fixtures. The
+   untouched "Symfony 4→5 Upgrade" row correctly has **no** `lastModified` key at all (`undefined`,
+   per Key decision #1/#3 — not `""`, not fabricated) — proving the "blank cell on an unmigrated row"
+   half of the contract against a real page, not just a unit-test fixture. (Not personally
+   re-confirmed by opening the Confluence page in a browser — relying on the write side's own
+   independent real-API confirmation of the same value, which is the actual point of this
+   cross-repo check; same non-blocking caveat already carried in `curated-guide-retrieval.md`'s
+   Verification section about UI-level visual confirmation.)
+3. **Done.** The re-synced row's date came back as exactly `"2026-09-07"` — no off-by-one shift.
+   Confirms Key decision #3 (never constructing a `Date` object from this value) in practice, not
+   just in theory.
 
 ## Boundaries
 
