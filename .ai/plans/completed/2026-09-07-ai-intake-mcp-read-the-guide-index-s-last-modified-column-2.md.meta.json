@@ -1,0 +1,11 @@
+{
+  "id": "2026-09-07-ai-intake-mcp-read-the-guide-index-s-last-modified-column-2",
+  "title": "ai-intake-mcp — read the guide index's Last Modified column",
+  "date": "2026-09-07T05:29:43.405Z",
+  "description": "Read-side plan: parse and surface a new Last Modified column on the shared guide index once the companion ai-intake-documentation-mcp write-side plan produces it.",
+  "ticket_key": null,
+  "status": "completed",
+  "created_by": "Davinder S. Mahal (via Claude Code)",
+  "approved_at": "2026-09-07T05:51:29.726Z",
+  "updated_at": "2026-09-07T07:15:00.000Z"
+}
