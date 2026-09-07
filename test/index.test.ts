@@ -28,8 +28,10 @@ describe("ai-intake-mcp server wiring", () => {
     expect(names).toEqual(
       [
         "approve_plan",
+        "fetch_guide",
         "health_check",
         "implement_ticket",
+        "list_guides",
         "tracker_add_comment",
         "tracker_create_issue",
         "tracker_get_issue",

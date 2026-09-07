@@ -1,0 +1,12 @@
+{
+  "id": "a87b1e84-7785-492d-b5ec-9ce22a3539fd",
+  "date": "2026-09-07T05:16:16.714Z",
+  "synthesized": false,
+  "related_files": [
+    ".ai/intake-mcp.json"
+  ],
+  "ticket_key": null,
+  "type": "raw-note",
+  "source": "legacy-doc",
+  "content": "{\n  \"jiraProjectKey\": \"DAV\",\n  \"appTag\": \"app:ai-intake-mcp\"\n}\n"
+}

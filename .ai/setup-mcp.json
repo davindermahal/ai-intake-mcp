@@ -1,0 +1,12 @@
+{
+  "schema_version": "0.1.0",
+  "last_scan_sha": null,
+  "last_synthesis_at": null,
+  "evidence_pending_count": 18,
+  "evidence_pending_corrections": 0,
+  "needs_resync": false,
+  "doc_index": {
+    "docs": [],
+    "context": []
+  }
+}
