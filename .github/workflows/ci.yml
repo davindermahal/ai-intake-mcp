@@ -14,6 +14,13 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24
+      # keytar's native binding needs libsecret's shared library at *runtime*, not just build time
+      # -- without it, merely importing the module throws "libsecret-1.so.0: cannot open shared
+      # object file", which any test touching src/jira/auth-cookie.ts hits at import time (even
+      # via fakes). This repo's own Dockerfile already documents and installs this for local dev;
+      # ubuntu-latest runners don't have it by default. Confirmed live: CI failed on exactly this
+      # before this step was added.
+      - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libsecret-1-0
       - run: npm ci
       - run: npm run lint
       - run: npm run build

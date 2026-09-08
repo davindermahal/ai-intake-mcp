@@ -49,6 +49,11 @@ jobs:
       - run: npm install -g npm@latest
       - run: npm --version
 
+      # See ci.yml's identical step for why: keytar's native binding needs libsecret's shared
+      # library at runtime, which ubuntu-latest doesn't have by default. Confirmed live: v0.2.0's
+      # first release run failed here (correctly stopped before the publish step -- nothing broken
+      # got published).
+      - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libsecret-1-0
       - run: npm ci
       - run: npm run lint
       - run: npm run build
