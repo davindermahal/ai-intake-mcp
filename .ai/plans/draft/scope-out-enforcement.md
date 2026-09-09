@@ -1,8 +1,10 @@
 # Plan (draft): `ai-intake-mcp` — code-level enforcement of `Scope` → "Out"
 
-**Status**: draft
+**Status**: deferred — not needed right now. Kept as a future idea, not active work. Revisit only if
+weaker-executor scope violations turn out to be a real, observed problem — don't build ahead of that
+need (developer call, 2026-09-08).
 **Created**: 2026-08-30
-**Updated**: 2026-08-30
+**Updated**: 2026-09-08
 **Related**: `docs/planning-procedure.md` (plan file shape, `## Boundaries` requirement),
 `docs/implementation-procedure.md` (hard limits), `src/plan-file.ts` (`planHasBoundariesSection`,
 added alongside this idea as the first, simpler guardrail), `src/tools/tracker-transition.ts`,

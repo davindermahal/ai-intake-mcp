@@ -1,8 +1,13 @@
 # Plan (draft): `ai-intake-mcp` — implementation phase (approved plan → implemented, verified, committed)
 
-**Status**: active
+**Status**: complete — all 5 Phases implemented (`approve_plan`, `worktree_remove`, `implement_ticket`,
+`docs/implementation-procedure.md`, `.ai/intake-mcp.md` convention, dogfooded against this repo
+itself, all confirmed built and tested). The "Remaining open" section below is stale-but-kept: both
+its items were already resolved by `.ai/plans/completed/ai-intake-mcp-hardening-phase.md`, noted
+inline there at the time — nothing left open. Left `active` for a while after it was actually done;
+correcting that now. Kept as the permanent design record (per `.ai/README.md`'s read order).
 **Created**: 2026-08-28
-**Updated**: 2026-08-28
+**Updated**: 2026-09-08
 **Related**: `.ai/plans/active/ai-intake-mcp-on-demand-planning.md` (the v1 planning-phase plan this
 one extends — all of its decisions stand unchanged unless explicitly revised below), the
 `ai-intake-harness` repo's `worktree-go.sh`/`worktree-remove.sh`/`lib/worktree-common.sh` (its

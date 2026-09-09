@@ -1,8 +1,11 @@
 # Plan (draft): `ai-intake-mcp` — on-demand ticket planning via MCP, no cron / no per-project install
 
-**Status**: active
+**Status**: complete — v1 planning phase, fully implemented and shipped (`@davindermahal/ai-intake-mcp`
+on public npm). Left `active` for a while after it was actually done; correcting that now. Kept as
+the permanent design record (per `.ai/README.md`'s read order) — its "Resolved (this round)" section
+and the rest of the doc stay as historical record, not rewritten.
 **Created**: 2026-08-28
-**Updated**: 2026-08-28
+**Updated**: 2026-09-08
 **Related**: the `ai-intake-harness` repo's `README.md` (its cron+poller architecture, which
 continues running unchanged — see "Goal" below), its `lib/tracker/jira-common.sh` and
 `lib/tracker/jira-tags.sh` (reference for Jira REST shape and the label-driven shared-board

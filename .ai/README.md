@@ -3,7 +3,7 @@
 **ai-intake-mcp** is an MCP server that lets a developer plan an issue-tracker ticket on demand,
 from inside their own project repo, using whatever MCP-capable agent CLI they already have open —
 no cron, no per-project install. See the repo root `README.md` for what it does; see
-`.ai/plans/active/ai-intake-mcp-on-demand-planning.md` for the full design record.
+`.ai/plans/completed/ai-intake-mcp-on-demand-planning.md` for the full design record.
 
 This project is related to, but independent of, `ai-intake-harness` (a separate repo): that project
 runs a cron-driven poller that automates a ticket's full lifecycle (planning *and*
@@ -16,11 +16,11 @@ naming a ticket, with no dependency on that repo's code.
 2. [`system.md`](system.md) — what this project is, core design decisions, tool surface.
 3. [`repo-map.md`](repo-map.md) — directory-by-directory map of the codebase.
 4. `../README.md` (repo root) — what the tool does, current status.
-5. `.ai/plans/active/ai-intake-mcp-on-demand-planning.md` — the full design record for the planning
+5. `.ai/plans/completed/ai-intake-mcp-on-demand-planning.md` — the full design record for the planning
    phase (v1, implemented): every decision, why it was made, what's still open.
-5b. `.ai/plans/active/ai-intake-mcp-implementation-phase.md` — the design record for the
-   implementation phase (extends v1; not yet implemented): turning an approved plan into
-   implemented, verified, committed code.
+5b. `.ai/plans/completed/ai-intake-mcp-implementation-phase.md` — the design record for the
+   implementation phase (extends v1; implemented): turning an approved plan into implemented,
+   verified, committed code.
 6. `.ai/guides/ai-intake-mcp-vs-harness.md` — a functional comparison against `ai-intake-harness`,
    useful for understanding what this project deliberately does *not* do (and why).
 
@@ -46,7 +46,7 @@ Place this checkpoint as early and as narrowly-scoped as the plan allows (e.g. a
 end of the phase that builds the integration, before later phases build on top of it) rather than
 deferring it entirely to a final end-to-end/dogfood step — the narrower the checkpoint, the easier a
 real-system surprise is to isolate. See
-`.ai/plans/active/ai-intake-mcp-on-demand-planning.md`'s "Verification checkpoints" section for the
+`.ai/plans/completed/ai-intake-mcp-on-demand-planning.md`'s "Verification checkpoints" section for the
 pattern.
 
 This is now also a structural requirement of the plan format itself, not just a principle to
