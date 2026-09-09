@@ -21,6 +21,15 @@ and two small config files.
 what you'll see, and what to do at each point. It's written for using the tool, not for the
 internals.
 
+## Confluence references
+
+Planning pulls in Confluence content two ways, both cited in the resulting plan: a curated guide
+catalog (`list_guides`/`fetch_guide`, e.g. "following the Symfony 4→5 Upgrade guide"), and any
+Confluence page linked explicitly in the ticket's description/comments or named mid-conversation
+(`fetch_confluence_pages`). Headless workers get the same fetched content via a pre-written file,
+never live MCP tool access. See
+[`.ai/plans/completed/confluence-references-in-planning.md`](.ai/plans/completed/confluence-references-in-planning.md).
+
 ## Headless automation
 
 The same pipeline can also run unattended, on a cron, across one or more registered repos — no
@@ -108,6 +117,10 @@ cd ~/dev/ai-intake-mcp && ./install.sh
 
 See [`docs/setup.md`](docs/setup.md) for what that does and does not automate (Jira credentials
 still need to be filled in by hand), and for the full walk-through either way.
+
+## Changelog
+
+See [`CHANGELOG.md`](CHANGELOG.md) for release history.
 
 ## License
 
