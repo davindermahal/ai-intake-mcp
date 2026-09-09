@@ -3,6 +3,14 @@
 All notable changes to `@davindermahal/ai-intake-mcp` are documented here. Versions correspond to
 tags (`vX.Y.Z`) and npm releases; see `.ai/plans/` for the full design record behind each change.
 
+## 0.3.2 — 2026-09-09
+
+### Fixed
+- `buildDiscoveryJql` now escapes `"`/`\` in project keys and the app tag before embedding them in
+  JQL string literals, instead of interpolating them unescaped.
+- `worktreeCreate`'s stale-directory error now suggests removing or moving the directory aside
+  instead of just refusing.
+
 ## 0.3.1 — 2026-09-09
 
 ### Fixed

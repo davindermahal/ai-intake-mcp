@@ -19,6 +19,11 @@ export interface DiscoveryQuery {
   assignedToCurrentUser?: boolean;
 }
 
+/** Escapes a value for embedding inside a double-quoted JQL string literal (backslash and `"`). */
+function jqlQuote(value: string): string {
+  return `"${value.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
+}
+
 export function buildDiscoveryJql(query: DiscoveryQuery): string {
   if (query.projectKeys.length === 0) {
     throw new Error("buildDiscoveryJql: projectKeys must be non-empty.");
@@ -27,12 +32,12 @@ export function buildDiscoveryJql(query: DiscoveryQuery): string {
     throw new Error("buildDiscoveryJql: stateLabels must be non-empty.");
   }
 
-  const projectClause = `project in (${query.projectKeys.map((k) => `"${k}"`).join(", ")})`;
-  const appTagClause = `labels = "${query.appTag}"`;
+  const projectClause = `project in (${query.projectKeys.map((k) => jqlQuote(k)).join(", ")})`;
+  const appTagClause = `labels = ${jqlQuote(query.appTag)}`;
   const stateClause =
     query.stateLabels.length === 1
-      ? `labels = "${STATE_LABEL[query.stateLabels[0] as ShortState]}"`
-      : `(${query.stateLabels.map((s) => `labels = "${STATE_LABEL[s]}"`).join(" OR ")})`;
+      ? `labels = ${jqlQuote(STATE_LABEL[query.stateLabels[0] as ShortState])}`
+      : `(${query.stateLabels.map((s) => `labels = ${jqlQuote(STATE_LABEL[s])}`).join(" OR ")})`;
 
   const clauses = [projectClause, appTagClause, stateClause];
   if (query.assignedToCurrentUser !== false) clauses.push("assignee = currentUser()");

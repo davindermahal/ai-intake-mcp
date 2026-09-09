@@ -206,7 +206,8 @@ export async function worktreeCreate(
     worktreePath = join(dirname(repoRoot), branch.replace(/\//g, "-"));
     if (existsSync(worktreePath)) {
       throw new Error(
-        `${worktreePath} already exists but isn't a registered worktree for ${branch} — refusing to overwrite.`,
+        `${worktreePath} already exists but isn't a registered worktree for ${branch} — refusing to overwrite. ` +
+          `If it's stale, remove it manually (or move it aside) and retry.`,
       );
     }
 
