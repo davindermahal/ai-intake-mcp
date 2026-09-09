@@ -3,6 +3,12 @@
 All notable changes to `@davindermahal/ai-intake-mcp` are documented here. Versions correspond to
 tags (`vX.Y.Z`) and npm releases; see `.ai/plans/` for the full design record behind each change.
 
+## 0.3.1 — 2026-09-09
+
+### Fixed
+- Publish now actually includes `CHANGELOG.md` (0.3.0 predated this file, so the fix couldn't ship
+  until this release).
+
 ## 0.3.0 — 2026-09-08
 
 ### Added
