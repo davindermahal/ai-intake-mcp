@@ -22,6 +22,13 @@ Next: <what you're about to start>
 This is the only way the orchestrator can report your progress back to Jira while you work — do not
 skip it, and append (never overwrite) the file.
 
+**Confluence context**: read `{{CONFLUENCE_CONTEXT_FILE_PATH}}` — a JSON file
+(`{guideCatalog: [...], referencedPages: [...]}`) the orchestrator pre-fetched before launch, since you
+have no MCP tool access to fetch this yourself. Gather it per the instructions below before drafting
+the plan.
+
+{{INCLUDE:_fragments/confluence-context.md}}
+
 ---
 
 The plan-shape and quality requirements below are quoted, not paraphrased, from
@@ -52,6 +59,11 @@ ls .ai/plans/active/{{TICKET_KEY}}-*.md
 **Branch**: <this worktree's branch>
 **Created**: <YYYY-MM-DD>
 **Updated**: <YYYY-MM-DD>
+**Guides used**: <comma-separated guide title(s) fetched and applied, e.g. "Symfony 4→5 Upgrade" —
+omit this line entirely when no guide matched>
+**Confluence pages referenced**: <comma-separated `[Title](url) — last updated <lastModified date>`
+entries for every page `fetch_confluence_pages` returned — omit this line entirely when the tool
+wasn't called or returned nothing>
 ```
 
 Then: **Goal**, **Scope** (in/out), **Files to change** (one-line reason each), **Key decisions**,

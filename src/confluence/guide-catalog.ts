@@ -1,5 +1,4 @@
-import type { ConfluenceClient } from "./client.js";
-import { fetchPageByUrl } from "./client.js";
+import { fetchPageByUrl, type ConfluenceClient } from "@davindermahal/confluence-client";
 import { parseGuideIndex, type GuideIndexEntry } from "./index-parser.js";
 
 let cached: GuideIndexEntry[] | undefined;
@@ -12,7 +11,7 @@ let cached: GuideIndexEntry[] | undefined;
 export async function getGuideCatalog(client: ConfluenceClient, indexUrl: string): Promise<GuideIndexEntry[]> {
   if (!cached) {
     const page = await fetchPageByUrl(client, indexUrl);
-    cached = parseGuideIndex(page.body.storage.value);
+    cached = parseGuideIndex(page.storageBody);
   }
   return cached;
 }

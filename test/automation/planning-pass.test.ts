@@ -80,6 +80,7 @@ function makeCtx(fetchImpl: typeof fetch, launch = vi.fn().mockReturnValue({ pid
   };
   return {
     client: new JiraClient({ config, fetchImpl }),
+    config,
     repoConfig,
     project,
     settings,

@@ -19,25 +19,7 @@ Use the `summary`, `status`, `description`, and `comments` already returned by `
 Read the existing comments so you don't re-ask something the ticket's author already answered in a
 previous round.
 
-### Check for a relevant guide
-
-Call `list_guides`. If it reports the guide index isn't configured, skip this entirely — today's
-behavior, unchanged. Otherwise:
-
-- Always give any `always`-tagged entry (e.g. company conventions) a light default check.
-- Match the ticket's summary/description against the other entries' titles/descriptions (e.g. a
-  ticket that says "upgrade app from Symfony 4.4" matches a "Symfony 4→5 Upgrade" title).
-- Call `fetch_guide` **only** for entries that actually matched — don't fetch everything in the
-  catalog "just in case." If nothing matches, don't fall back to searching Confluence directly;
-  there is no such tool, by design.
-- A fetched guide's steps inform the plan you write in step 2, especially `## Implementation
-  order` and `## Key decisions` — treat it as prescriptive, not merely background reading.
-- **Reconcile against app-specific notes.** A guide is written for the general case (curated for
-  reuse across apps); this one app may have forked bundles, legacy hacks, or other quirks that mean
-  a step needs adjusting here. Check `.ai/intake-mcp.md` (this project's own free-form notes file,
-  `docs://implementation-procedure` §2) if it exists — that's the one place those deviations are
-  recorded, in-repo, not in Confluence. If it doesn't exist yet, don't create it during planning;
-  that's `docs://implementation-procedure`'s job once implementation starts.
+{{INCLUDE:_fragments/confluence-context.md}}
 
 ## 2. Find or create the plan file
 
@@ -65,6 +47,9 @@ ls .ai/plans/active/<TICKET-KEY>-*.md
 **Updated**: <YYYY-MM-DD>
 **Guides used**: <comma-separated guide title(s) fetched and applied, e.g. "Symfony 4→5 Upgrade" —
 omit this line entirely when no guide matched>
+**Confluence pages referenced**: <comma-separated `[Title](url) — last updated <lastModified date>`
+entries for every page `fetch_confluence_pages` returned — omit this line entirely when the tool
+wasn't called or returned nothing>
 ```
 
 Then: **Goal**, **Scope** (in/out), **Files to change** (one-line reason each), **Key decisions**,
@@ -234,7 +219,8 @@ Never `git push` — same boundary as implementation sessions (`docs://implement
 **No blocking questions:**
 1. `tracker_add_comment(key, "Plan ready for review at .ai/plans/active/<KEY>-<slug>.md. Summary: <2-4 sentence summary of approach, files, and key decisions>.")` —
    if any guide was consulted (per "Check for a relevant guide" in step 1), name it in the summary,
-   e.g. "...following the Symfony 4→5 Upgrade guide."
+   e.g. "...following the Symfony 4→5 Upgrade guide." Likewise, if any Confluence page was fetched via
+   `fetch_confluence_pages`, name it too, e.g. "...consulted the team's incident runbook."
 2. `tracker_transition(key, "review")`
 
 That's the end of the session for this ticket. Do not attempt to move it further (`state:implement`

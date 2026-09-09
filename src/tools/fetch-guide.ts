@@ -1,7 +1,6 @@
+import { fetchPageByUrl, storageToPlainText, type ConfluenceClient } from "@davindermahal/confluence-client";
 import type { GlobalConfig } from "../config.js";
-import { fetchPageByUrl, type ConfluenceClient } from "../confluence/client.js";
 import { getGuideCatalog } from "../confluence/guide-catalog.js";
-import { storageToPlainText } from "../confluence/storage-text.js";
 
 export interface FetchGuideResult {
   title: string;
@@ -27,5 +26,5 @@ export async function fetchGuide(
     throw new Error(`"${title}" is not in the guide index. Call list_guides to see available titles.`);
   }
   const page = await fetchPageByUrl(client, entry.link);
-  return { title: entry.title, content: storageToPlainText(page.body.storage.value) };
+  return { title: entry.title, content: storageToPlainText(page.storageBody) };
 }
