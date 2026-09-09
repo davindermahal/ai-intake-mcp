@@ -28,6 +28,7 @@ describe("ai-intake-mcp server wiring", () => {
     expect(names).toEqual(
       [
         "approve_plan",
+        "fetch_confluence_pages",
         "fetch_guide",
         "health_check",
         "implement_ticket",
@@ -55,6 +56,29 @@ describe("ai-intake-mcp server wiring", () => {
     expect(prompts.map((p) => p.name).sort()).toEqual(["implement_ticket", "plan_ticket"]);
   });
 
+  it("plan_ticket declares confluence_links as an optional argument", async () => {
+    const { prompts } = await client.listPrompts();
+    const planTicket = prompts.find((p) => p.name === "plan_ticket");
+    const confluenceLinksArg = planTicket?.arguments?.find((a) => a.name === "confluence_links");
+    expect(confluenceLinksArg?.required).toBeFalsy();
+  });
+
+  it("plan_ticket includes operator-named Confluence links in the rendered prompt when provided", async () => {
+    const result = await client.getPrompt({
+      name: "plan_ticket",
+      arguments: { ticket_key: "DAV-5", confluence_links: "https://example.atlassian.net/wiki/x/1" },
+    });
+    const text = (result.messages[0]?.content as { type: "text"; text: string }).text;
+    expect(text).toContain("https://example.atlassian.net/wiki/x/1");
+    expect(text).toContain("fetch_confluence_pages");
+  });
+
+  it("plan_ticket omits the Confluence-links line entirely when none is given", async () => {
+    const result = await client.getPrompt({ name: "plan_ticket", arguments: { ticket_key: "DAV-5" } });
+    const text = (result.messages[0]?.content as { type: "text"; text: string }).text;
+    expect(text).not.toContain("fetch_confluence_pages");
+  });
+
   it("registers all three docs resources", async () => {
     const { resources } = await client.listResources();
     expect(resources.map((r) => r.uri).sort()).toEqual(
@@ -65,6 +89,14 @@ describe("ai-intake-mcp server wiring", () => {
   it("serves a doc resource's real file content", async () => {
     const result = await client.readResource({ uri: "docs://planning-procedure" });
     expect(result.contents[0]?.text).toContain("# Planning procedure");
+  });
+
+  it("resolves the shared confluence-context fragment's INCLUDE token when serving a doc resource", async () => {
+    const result = await client.readResource({ uri: "docs://planning-procedure" });
+    const text = result.contents[0]?.text as string;
+    expect(text).not.toContain("{{INCLUDE:");
+    expect(text).toContain("Check for a relevant guide");
+    expect(text).toContain("fetch_confluence_pages");
   });
 
   it("tracker_transition's state enum excludes plan and implement", async () => {

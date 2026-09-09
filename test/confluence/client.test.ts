@@ -112,19 +112,27 @@ describe("extractPageIdFromUrl", () => {
 });
 
 describe("fetchPageByUrl", () => {
-  it("fetches the page by its extracted ID with body.storage expanded", async () => {
+  it("fetches the page by its extracted ID with body.storage and version expanded", async () => {
     let seenUrl: string | undefined;
     const fetchImpl = vi.fn(async (input: RequestInfo | URL) => {
       seenUrl = String(input);
       return new Response(
-        JSON.stringify({ id: "12345", title: "Symfony 4→5 Upgrade", body: { storage: { value: "<p>x</p>", representation: "storage" } } }),
+        JSON.stringify({
+          id: "12345",
+          title: "Symfony 4→5 Upgrade",
+          body: { storage: { value: "<p>x</p>", representation: "storage" } },
+          version: { when: "2021-03-14T10:00:00.000Z" },
+        }),
         { status: 200 },
       );
     });
     const client = new ConfluenceClient({ config: baseConfig, fetchImpl });
     const page = await fetchPageByUrl(client, "https://example.atlassian.net/wiki/spaces/ENG/pages/12345/Symfony");
-    expect(seenUrl).toBe("https://example.atlassian.net/wiki/rest/api/content/12345?expand=body.storage");
+    expect(seenUrl).toBe(
+      "https://example.atlassian.net/wiki/rest/api/content/12345?expand=body.storage,version",
+    );
     expect(page.title).toBe("Symfony 4→5 Upgrade");
+    expect(page.version?.when).toBe("2021-03-14T10:00:00.000Z");
   });
 
   it("throws when the URL has no extractable page ID", async () => {

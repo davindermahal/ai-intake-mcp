@@ -5,9 +5,20 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { type DispatchContext, dispatchWorker } from "../../src/automation/dispatch.js";
 import type { ProjectEntry } from "../../src/automation/registry.js";
-import { contextFilePath, readWorkerContext } from "../../src/automation/result-file.js";
+import { confluenceContextFilePath, contextFilePath, readConfluenceContext, readWorkerContext } from "../../src/automation/result-file.js";
 import type { AutomationSettings } from "../../src/automation/settings.js";
+import type { GlobalConfig } from "../../src/config.js";
+import { ConfluenceClient } from "../../src/confluence/client.js";
 import type { JiraIssue } from "../../src/jira/tags.js";
+
+const config: GlobalConfig = {
+  jiraSiteUrl: "https://example.atlassian.net",
+  jiraEmail: "bot@example.com",
+  jiraApiToken: "test-token",
+  trackerNativeStatusInProgress: "In Progress",
+  trackerNativeStatusCodeReview: "Code Review",
+  jiraCookieBrowser: "chrome",
+};
 
 const settings: AutomationSettings = {
   watchdog: {
@@ -61,7 +72,7 @@ afterEach(() => {
 describe("dispatchWorker", () => {
   it("creates the worktree, writes the context file, renders the prompt, and launches the default provider", async () => {
     const launch = vi.fn().mockReturnValue({ pid: 4242, logPath: "/fake/log" });
-    const ctx: DispatchContext = { project, settings, stateRoot, launch };
+    const ctx: DispatchContext = { project, config, settings, stateRoot, launch };
 
     const result = await dispatchWorker(ctx, issue(), "planning", 1);
 
@@ -100,7 +111,7 @@ describe("dispatchWorker", () => {
 
   it("resolves the implementation prompt template for the implementation phase", async () => {
     const launch = vi.fn().mockReturnValue({ pid: 1, logPath: "/fake/log" });
-    const ctx: DispatchContext = { project, settings, stateRoot, launch };
+    const ctx: DispatchContext = { project, config, settings, stateRoot, launch };
 
     await dispatchWorker(ctx, issue({ labels: ["state:implement", "app:my-repo"] }), "implementation", 1);
 
@@ -111,7 +122,7 @@ describe("dispatchWorker", () => {
 
   it("resolves a ticket-labeled provider profile over the default", async () => {
     const launch = vi.fn().mockReturnValue({ pid: 1, logPath: "/fake/log" });
-    const ctx: DispatchContext = { project, settings, stateRoot, launch };
+    const ctx: DispatchContext = { project, config, settings, stateRoot, launch };
 
     await dispatchWorker(ctx, issue({ labels: ["state:plan", "ai-plan-fast-impl"] }), "planning", 1);
 
@@ -125,11 +136,70 @@ describe("dispatchWorker", () => {
 
   it("passes the given attempts count through to the launcher", async () => {
     const launch = vi.fn().mockReturnValue({ pid: 1, logPath: "/fake/log" });
-    const ctx: DispatchContext = { project, settings, stateRoot, launch };
+    const ctx: DispatchContext = { project, config, settings, stateRoot, launch };
 
     await dispatchWorker(ctx, issue(), "planning", 3);
 
     const options = launch.mock.calls[0]?.[1] as Record<string, unknown>;
     expect(options.attempts).toBe(3);
+  });
+
+  it("pre-fetches Confluence context for a planning launch and points the prompt at the written file (Option B)", async () => {
+    const fetchImpl = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("/222")) {
+        return new Response(
+          JSON.stringify({
+            id: "222",
+            title: "Runbook",
+            body: { storage: { representation: "storage", value: "<p>Do this.</p>" } },
+            version: { when: "2024-05-01T00:00:00.000Z" },
+          }),
+          { status: 200 },
+        );
+      }
+      throw new Error(`unexpected fetch: ${url}`);
+    });
+    const confluenceClient = new ConfluenceClient({ config, fetchImpl });
+    const launch = vi.fn().mockReturnValue({ pid: 1, logPath: "/fake/log" });
+    const ctx: DispatchContext = { project, config, settings, stateRoot, launch, confluenceClient };
+
+    await dispatchWorker(
+      ctx,
+      issue({ description: "See https://example.atlassian.net/wiki/spaces/ENG/pages/222/Runbook for context." }),
+      "planning",
+      1,
+    );
+
+    const expectedPath = confluenceContextFilePath("my-app", "DAV-5", stateRoot);
+    const written = readConfluenceContext("my-app", "DAV-5", stateRoot);
+    expect(written).toEqual({
+      guideCatalog: [],
+      referencedPages: [
+        {
+          url: "https://example.atlassian.net/wiki/spaces/ENG/pages/222/Runbook",
+          title: "Runbook",
+          content: "Do this.",
+          lastModified: "2024-05-01T00:00:00.000Z",
+        },
+      ],
+    });
+
+    const options = launch.mock.calls[0]?.[1] as Record<string, unknown>;
+    const promptContent = readFileSync(options.promptPath as string, "utf8");
+    expect(promptContent).toContain(expectedPath);
+    expect(promptContent).not.toMatch(/\{\{\w+\}\}/);
+  });
+
+  it("does not pre-fetch or write Confluence context for an implementation-phase launch", async () => {
+    const fetchImpl = vi.fn();
+    const confluenceClient = new ConfluenceClient({ config, fetchImpl });
+    const launch = vi.fn().mockReturnValue({ pid: 1, logPath: "/fake/log" });
+    const ctx: DispatchContext = { project, config, settings, stateRoot, launch, confluenceClient };
+
+    await dispatchWorker(ctx, issue({ labels: ["state:implement", "app:my-repo"] }), "implementation", 1);
+
+    expect(fetchImpl).not.toHaveBeenCalled();
+    expect(readConfluenceContext("my-app", "DAV-5", stateRoot)).toBeUndefined();
   });
 });

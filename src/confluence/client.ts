@@ -132,6 +132,7 @@ export interface ConfluencePageBody {
   id: string;
   title: string;
   body: { storage: { value: string; representation: "storage" } };
+  version?: { when: string };
 }
 
 /**
@@ -153,5 +154,5 @@ export async function fetchPageByUrl(client: ConfluenceClient, url: string): Pro
   if (!pageId) {
     throw new Error(`Could not extract a Confluence page ID from URL: ${url}`);
   }
-  return client.get<ConfluencePageBody>(`/wiki/rest/api/content/${pageId}?expand=body.storage`);
+  return client.get<ConfluencePageBody>(`/wiki/rest/api/content/${pageId}?expand=body.storage,version`);
 }

@@ -11,10 +11,12 @@ import {
 import { McpServer, type CallToolResult } from "@modelcontextprotocol/server";
 import { StdioServerTransport } from "@modelcontextprotocol/server/stdio";
 import { z } from "zod";
+import { resolveIncludes } from "./automation/prompt-template.js";
 import { loadGlobalConfig, type GlobalConfig } from "./config.js";
 import { ConfluenceClient } from "./confluence/client.js";
 import { JiraClient } from "./jira/client.js";
 import { approvePlanTool } from "./tools/approve-plan.js";
+import { fetchConfluencePages } from "./tools/fetch-confluence-pages.js";
 import { fetchGuide } from "./tools/fetch-guide.js";
 import { healthCheck } from "./tools/health-check.js";
 import { implementTicketTool } from "./tools/implement-ticket.js";
@@ -125,6 +127,28 @@ server.registerTool(
   async ({ title }) => {
     try {
       return ok(await fetchGuide(getConfluenceClient(), getConfig(), title));
+    } catch (err) {
+      return fail(err);
+    }
+  },
+);
+
+server.registerTool(
+  "fetch_confluence_pages",
+  {
+    description:
+      "Fetches specific Confluence pages by URL — ticket-referenced or operator-named links, not a " +
+      "catalog. Partial-failure tolerant: returns one entry per URL that resolves to a page on this " +
+      "site (title, content, lastModified, error?); a URL that isn't a fetchable Confluence page on " +
+      "this site (wrong host, or no extractable page ID) is silently skipped, not an error.",
+    inputSchema: z.object({
+      urls: z.array(z.string()).describe("Candidate Confluence page URLs; non-matching ones are silently skipped"),
+    }),
+    annotations: { readOnlyHint: true, title: "Fetch Confluence pages" },
+  },
+  async ({ urls }) => {
+    try {
+      return ok({ pages: await fetchConfluencePages(getConfluenceClient(), getConfig(), urls) });
     } catch (err) {
       return fail(err);
     }
@@ -315,7 +339,13 @@ function registerDocResource(name: string, uri: string, file: string, descriptio
     uri,
     { description, mimeType: "text/markdown" },
     (readUri) => ({
-      contents: [{ uri: readUri.href, mimeType: "text/markdown", text: readFileSync(join(DOCS_DIR, file), "utf8") }],
+      contents: [
+        {
+          uri: readUri.href,
+          mimeType: "text/markdown",
+          text: resolveIncludes(readFileSync(join(DOCS_DIR, file), "utf8")),
+        },
+      ],
     }),
   );
 }
@@ -345,9 +375,18 @@ server.registerPrompt(
   "plan_ticket",
   {
     description: "Plan a ticket: fetch it, read the planning procedure, create/resume its worktree.",
-    argsSchema: z.object({ ticket_key: z.string().describe("Ticket key, e.g. DAV-5") }),
+    argsSchema: z.object({
+      ticket_key: z.string().describe("Ticket key, e.g. DAV-5"),
+      confluence_links: z
+        .string()
+        .optional()
+        .describe(
+          "Optional: Confluence page URL(s) the developer wants fetched during planning, space- or " +
+            "comma-separated (confluence-references-in-planning.md Design #3, operator-named source)",
+        ),
+    }),
   },
-  ({ ticket_key: ticketKey }) => ({
+  ({ ticket_key: ticketKey, confluence_links: confluenceLinks }) => ({
     messages: [
       {
         role: "user",
@@ -355,6 +394,10 @@ server.registerPrompt(
           type: "text",
           text:
             `Plan ticket ${ticketKey}. Do this, in order:\n` +
+            (confluenceLinks
+              ? `Operator-named Confluence links to fetch during context-gathering (pass these to ` +
+                `fetch_confluence_pages alongside anything found in the ticket itself): ${confluenceLinks}\n`
+              : "") +
             `1. Call tracker_get_issue with key="${ticketKey}".\n` +
             `2. Read the docs://planning-procedure resource.\n` +
             `3. Call worktree_create with ticket_key="${ticketKey}", then change into the returned ` +

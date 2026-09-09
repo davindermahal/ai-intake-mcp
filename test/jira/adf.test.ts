@@ -58,6 +58,64 @@ describe("adfToPlainText", () => {
     };
     expect(adfToPlainText(doc)).toBe("Hello world");
   });
+
+  it("emits an inlineCard's URL inline instead of dropping the node", () => {
+    const doc = {
+      type: "doc",
+      content: [
+        {
+          type: "paragraph",
+          content: [
+            { type: "text", text: "See " },
+            { type: "inlineCard", attrs: { url: "https://example.atlassian.net/wiki/spaces/ENG/pages/1/A" } },
+          ],
+        },
+      ],
+    };
+    expect(adfToPlainText(doc)).toBe("See https://example.atlassian.net/wiki/spaces/ENG/pages/1/A");
+  });
+
+  it("emits a blockCard's URL on its own line instead of dropping the node", () => {
+    const doc = {
+      type: "doc",
+      content: [
+        { type: "blockCard", attrs: { url: "https://example.atlassian.net/wiki/spaces/ENG/pages/2/B" } },
+      ],
+    };
+    expect(adfToPlainText(doc)).toBe("https://example.atlassian.net/wiki/spaces/ENG/pages/2/B");
+  });
+
+  it("emits a card node with no url attrs as an empty line rather than throwing", () => {
+    const doc = { type: "doc", content: [{ type: "blockCard", attrs: {} }] };
+    expect(adfToPlainText(doc)).toBe("");
+  });
+
+  it("emits a link mark's href alongside a text node's visible text", () => {
+    const doc = {
+      type: "doc",
+      content: [
+        {
+          type: "paragraph",
+          content: [
+            {
+              type: "text",
+              text: "the runbook",
+              marks: [{ type: "link", attrs: { href: "https://example.atlassian.net/wiki/spaces/ENG/pages/3/C" } }],
+            },
+          ],
+        },
+      ],
+    };
+    expect(adfToPlainText(doc)).toBe("[the runbook](https://example.atlassian.net/wiki/spaces/ENG/pages/3/C)");
+  });
+
+  it("leaves plain text without a link mark unaffected", () => {
+    const doc = {
+      type: "doc",
+      content: [{ type: "paragraph", content: [{ type: "text", text: "plain", marks: [{ type: "strong" }] }] }],
+    };
+    expect(adfToPlainText(doc)).toBe("plain");
+  });
 });
 
 describe("plainTextToAdf", () => {

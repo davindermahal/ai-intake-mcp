@@ -7,22 +7,24 @@ import { renderPrompt } from "../src/automation/prompt-template.js";
 // render them is: both templates must keep using exactly the tokens the orchestrator will fill in.
 const REQUIRED_PLACEHOLDERS = ["TICKET_KEY", "CONTEXT_FILE_PATH", "PROGRESS_LOG_PATH", "RESULT_FILE_PATH"];
 
-const VALUES = Object.fromEntries(REQUIRED_PLACEHOLDERS.map((key) => [key, `<${key}>`]));
-
 describe.each([
-  ["prompts/headless-planning.md"],
-  ["prompts/headless-implementation.md"],
-])("%s", (path) => {
+  // CONFLUENCE_CONTEXT_FILE_PATH is planning-only (confluence-references-in-planning.md Option B) —
+  // headless-implementation.md never gathers Confluence context, so it doesn't get this placeholder.
+  ["prompts/headless-planning.md", ["CONFLUENCE_CONTEXT_FILE_PATH"]],
+  ["prompts/headless-implementation.md", []],
+] as const)("%s", (path, extraPlaceholders) => {
   const content = readFileSync(path, "utf8");
+  const placeholders = [...REQUIRED_PLACEHOLDERS, ...extraPlaceholders];
+  const values = Object.fromEntries(placeholders.map((key) => [key, `<${key}>`]));
 
   it("contains every required placeholder", () => {
-    for (const placeholder of REQUIRED_PLACEHOLDERS) {
+    for (const placeholder of placeholders) {
       expect(content).toContain(`{{${placeholder}}}`);
     }
   });
 
   it("renders cleanly with all required values supplied (no leftover/unknown placeholders)", () => {
-    const rendered = renderPrompt(content, VALUES);
+    const rendered = renderPrompt(content, values);
     expect(rendered).not.toMatch(/\{\{\w+\}\}/);
   });
 });

@@ -3,7 +3,10 @@ import { dirname } from "node:path";
 import { launchClaude } from "../ai/claude.js";
 import { launchGemini } from "../ai/gemini.js";
 import type { LaunchOptions, LaunchResult } from "../ai/launch.js";
+import type { GlobalConfig } from "../config.js";
+import { ConfluenceClient } from "../confluence/client.js";
 import type { JiraIssue } from "../jira/tags.js";
+import { buildWorkerConfluenceContext } from "./confluence-context.js";
 import { renderPrompt } from "./prompt-template.js";
 import { type PromptName, promptTemplatePath } from "./prompts.js";
 import type { ProjectEntry } from "./registry.js";
@@ -14,6 +17,7 @@ import {
   progressLogPath,
   promptFilePath,
   resultFilePath,
+  writeConfluenceContext,
   writeWorkerContext,
 } from "./result-file.js";
 import { resolveProvider } from "./provider-selection.js";
@@ -34,10 +38,15 @@ export const defaultLaunch: LaunchFn = (provider, options) =>
 
 export interface DispatchContext {
   project: ProjectEntry;
+  /** Needed to pre-fetch Confluence context for a planning-phase launch (see below) — the same
+   * config `ConfluenceClient` and `list_guides`/`fetch_confluence_pages` already use interactively. */
+  config: GlobalConfig;
   settings: AutomationSettings;
   stateRoot?: string;
   /** Test seam (decision #21) — defaults to actually spawning `claude`/`gemini`. */
   launch?: LaunchFn;
+  /** Test seam — defaults to a real `ConfluenceClient` built from `config`. */
+  confluenceClient?: ConfluenceClient;
   /** `--dry-run` (decision #21) — logs what would launch instead of actually spawning a provider. */
   dryRun?: boolean;
 }
@@ -69,9 +78,26 @@ export async function dispatchWorker(
   };
   writeWorkerContext(ctx.project.name, context, ctx.stateRoot);
 
+  // Pre-fetched here, not called as a tool by the worker (confluence-references-in-planning.md
+  // Option B) — a headless worker has no MCP tool access at all, so this runs server-side, before
+  // launch, in the orchestrator's own (credentialed) process. Planning-phase only: this feature's
+  // scope is gathering context for a plan, not for implementation.
+  const confluenceContextValues: Record<string, string> = {};
+  if (phase === "planning") {
+    const confluenceClient = ctx.confluenceClient ?? new ConfluenceClient({ config: ctx.config });
+    const confluenceContext = await buildWorkerConfluenceContext(confluenceClient, ctx.config, issue);
+    confluenceContextValues.CONFLUENCE_CONTEXT_FILE_PATH = writeConfluenceContext(
+      ctx.project.name,
+      issue.key,
+      confluenceContext,
+      ctx.stateRoot,
+    );
+  }
+
   const promptName: PromptName = phase === "planning" ? "headless-planning" : "headless-implementation";
   const template = readFileSync(promptTemplatePath(promptName), "utf8");
   const rendered = renderPrompt(template, {
+    ...confluenceContextValues,
     TICKET_KEY: issue.key,
     CONTEXT_FILE_PATH: contextFilePath(ctx.project.name, issue.key, ctx.stateRoot),
     PROGRESS_LOG_PATH: progressLogPath(ctx.project.name, issue.key, ctx.stateRoot),

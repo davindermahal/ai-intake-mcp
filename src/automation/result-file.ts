@@ -28,6 +28,22 @@ export interface WorkerContext {
   comments: { author: string; body: string; created: string }[];
 }
 
+/**
+ * Confluence context the orchestrator pre-fetches server-side before a headless planning launch and
+ * hands to the worker as a file (confluence-references-in-planning.md's Option B) — a headless worker
+ * has no MCP tool access at all (decision #1 above), so it can never call `list_guides`/
+ * `fetch_confluence_pages` itself the way an interactive `plan_ticket` session does. `guideCatalog` is
+ * metadata only (title/description/tags/lastModified, the same shape `list_guides` returns) — full
+ * guide content isn't pre-fetched (mirrors the interactive "don't fetch everything just in case" rule,
+ * and there's no way to know which guide, if any, will turn out relevant before the worker reads this).
+ * A guide linked directly by its Confluence URL is fetched like any other page and shows up in
+ * `referencedPages`, not specially cross-referenced back to `guideCatalog`.
+ */
+export interface WorkerConfluenceContext {
+  guideCatalog: { title: string; description: string; tags: string[]; lastModified?: string }[];
+  referencedPages: { url: string; title?: string; content?: string; lastModified?: string; error?: string }[];
+}
+
 /** The orchestrator decides `state:needs-input` vs. `state:review` itself, by reading the committed
  * plan file's `## Open Questions` section (decision #2) — this result only distinguishes a clean
  * run from a genuine, non-recoverable failure to produce a plan at all. */
@@ -85,6 +101,35 @@ export function readWorkerContext(
   const path = contextFilePath(projectName, ticketKey, stateRoot);
   if (!existsSync(path)) return undefined;
   return JSON.parse(readFileSync(path, "utf8")) as WorkerContext;
+}
+
+export function confluenceContextFilePath(
+  projectName: string,
+  ticketKey: string,
+  stateRoot: string = DEFAULT_STATE_ROOT,
+): string {
+  return join(stateRoot, projectName, "confluence-context", `${ticketKey}.json`);
+}
+
+export function writeConfluenceContext(
+  projectName: string,
+  ticketKey: string,
+  context: WorkerConfluenceContext,
+  stateRoot?: string,
+): string {
+  const path = confluenceContextFilePath(projectName, ticketKey, stateRoot);
+  writeJson(path, context);
+  return path;
+}
+
+export function readConfluenceContext(
+  projectName: string,
+  ticketKey: string,
+  stateRoot?: string,
+): WorkerConfluenceContext | undefined {
+  const path = confluenceContextFilePath(projectName, ticketKey, stateRoot);
+  if (!existsSync(path)) return undefined;
+  return JSON.parse(readFileSync(path, "utf8")) as WorkerConfluenceContext;
 }
 
 function readResult<T>(path: string, isValid: (value: unknown) => value is T): T | undefined {
