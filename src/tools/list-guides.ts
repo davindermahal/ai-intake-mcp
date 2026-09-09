@@ -1,5 +1,5 @@
+import type { ConfluenceClient } from "@davindermahal/confluence-client";
 import type { GlobalConfig } from "../config.js";
-import type { ConfluenceClient } from "../confluence/client.js";
 import { getGuideCatalog } from "../confluence/guide-catalog.js";
 
 export interface ListGuidesResult {

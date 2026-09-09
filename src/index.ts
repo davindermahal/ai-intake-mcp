@@ -11,9 +11,10 @@ import {
 import { McpServer, type CallToolResult } from "@modelcontextprotocol/server";
 import { StdioServerTransport } from "@modelcontextprotocol/server/stdio";
 import { z } from "zod";
+import { ConfluenceClient } from "@davindermahal/confluence-client";
 import { resolveIncludes } from "./automation/prompt-template.js";
 import { loadGlobalConfig, type GlobalConfig } from "./config.js";
-import { ConfluenceClient } from "./confluence/client.js";
+import { resolveConfluenceAuthOrThrow } from "./confluence/auth.js";
 import { JiraClient } from "./jira/client.js";
 import { approvePlanTool } from "./tools/approve-plan.js";
 import { fetchConfluencePages } from "./tools/fetch-confluence-pages.js";
@@ -43,7 +44,7 @@ function getClient(): JiraClient {
   return new JiraClient({ config: getConfig() });
 }
 function getConfluenceClient(): ConfluenceClient {
-  return new ConfluenceClient({ config: getConfig() });
+  return new ConfluenceClient(resolveConfluenceAuthOrThrow(getConfig()));
 }
 
 function ok(structuredContent: object): CallToolResult {

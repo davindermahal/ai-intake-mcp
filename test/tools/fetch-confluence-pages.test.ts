@@ -1,6 +1,7 @@
+import { ConfluenceClient } from "@davindermahal/confluence-client";
 import { describe, expect, it, vi } from "vitest";
 import type { GlobalConfig } from "../../src/config.js";
-import { ConfluenceClient } from "../../src/confluence/client.js";
+import { resolveConfluenceAuthOrThrow } from "../../src/confluence/auth.js";
 import { fetchConfluencePages } from "../../src/tools/fetch-confluence-pages.js";
 
 const baseConfig: GlobalConfig = {
@@ -12,13 +13,17 @@ const baseConfig: GlobalConfig = {
   jiraCookieBrowser: "chrome",
 };
 
+function newClient(config: GlobalConfig, fetchImpl: typeof fetch): ConfluenceClient {
+  return new ConfluenceClient({ ...resolveConfluenceAuthOrThrow(config), fetchImpl });
+}
+
 function pageResponse(id: string, title: string, when: string): Response {
   return new Response(
     JSON.stringify({
       id,
       title,
+      version: { number: 1, when },
       body: { storage: { value: `<p>content for ${title}</p>`, representation: "storage" } },
-      version: { when },
     }),
     { status: 200 },
   );
@@ -27,7 +32,7 @@ function pageResponse(id: string, title: string, when: string): Response {
 describe("fetchConfluencePages", () => {
   it("fetches every URL that matches the configured site host and has an extractable page ID", async () => {
     const fetchImpl = vi.fn(async () => pageResponse("111", "Design Doc", "2024-01-02T00:00:00.000Z"));
-    const client = new ConfluenceClient({ config: baseConfig, fetchImpl });
+    const client = newClient(baseConfig, fetchImpl);
     const results = await fetchConfluencePages(client, baseConfig, [
       "https://example.atlassian.net/wiki/spaces/ENG/pages/111/Design-Doc",
     ]);
@@ -44,7 +49,7 @@ describe("fetchConfluencePages", () => {
 
   it("silently skips a URL on the wrong host even though it pattern-matches a page ID (Key decision #5)", async () => {
     const fetchImpl = vi.fn(async () => pageResponse("999", "Wrong Host", "2024-01-01T00:00:00.000Z"));
-    const client = new ConfluenceClient({ config: baseConfig, fetchImpl });
+    const client = newClient(baseConfig, fetchImpl);
     const results = await fetchConfluencePages(client, baseConfig, [
       "https://not-our-confluence.example.com/wiki/spaces/ENG/pages/999/Something",
     ]);
@@ -54,7 +59,7 @@ describe("fetchConfluencePages", () => {
 
   it("silently skips a same-host URL with no extractable page ID (e.g. a space overview)", async () => {
     const fetchImpl = vi.fn();
-    const client = new ConfluenceClient({ config: baseConfig, fetchImpl });
+    const client = newClient(baseConfig, fetchImpl);
     const results = await fetchConfluencePages(client, baseConfig, [
       "https://example.atlassian.net/wiki/spaces/ENG/overview",
     ]);
@@ -67,7 +72,7 @@ describe("fetchConfluencePages", () => {
       if (String(input).includes("/111")) return pageResponse("111", "Good Page", "2024-01-02T00:00:00.000Z");
       return new Response("not found", { status: 404, statusText: "Not Found" });
     });
-    const client = new ConfluenceClient({ config: baseConfig, fetchImpl });
+    const client = newClient(baseConfig, fetchImpl);
     const results = await fetchConfluencePages(client, baseConfig, [
       "https://example.atlassian.net/wiki/spaces/ENG/pages/111/Good",
       "https://example.atlassian.net/wiki/spaces/ENG/pages/404/Missing",
@@ -86,7 +91,7 @@ describe("fetchConfluencePages", () => {
 
   it("propagates a ConfluenceApiError's message as the per-URL error", async () => {
     const fetchImpl = vi.fn(async () => new Response("nope", { status: 403, statusText: "Forbidden" }));
-    const client = new ConfluenceClient({ config: baseConfig, fetchImpl });
+    const client = newClient(baseConfig, fetchImpl);
     const results = await fetchConfluencePages(client, baseConfig, [
       "https://example.atlassian.net/wiki/spaces/ENG/pages/500/NoAccess",
     ]);
@@ -97,7 +102,7 @@ describe("fetchConfluencePages", () => {
   it("matches against confluenceSiteUrl when set, not jiraSiteUrl (Key decision #6's site-resolution rule)", async () => {
     const overrideConfig: GlobalConfig = { ...baseConfig, confluenceSiteUrl: "https://confluence.example.com" };
     const fetchImpl = vi.fn(async () => pageResponse("111", "On Override Site", "2024-01-02T00:00:00.000Z"));
-    const client = new ConfluenceClient({ config: overrideConfig, fetchImpl });
+    const client = newClient(overrideConfig, fetchImpl);
 
     const skipped = await fetchConfluencePages(client, overrideConfig, [
       "https://example.atlassian.net/wiki/spaces/ENG/pages/111/On-Jira-Host",
@@ -113,7 +118,7 @@ describe("fetchConfluencePages", () => {
   });
 
   it("returns an empty array for an empty input list", async () => {
-    const client = new ConfluenceClient({ config: baseConfig, fetchImpl: vi.fn() });
+    const client = newClient(baseConfig, vi.fn());
     expect(await fetchConfluencePages(client, baseConfig, [])).toEqual([]);
   });
 });

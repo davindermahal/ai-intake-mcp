@@ -1,7 +1,8 @@
+import { ConfluenceClient } from "@davindermahal/confluence-client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { buildWorkerConfluenceContext, extractCandidateUrls } from "../../src/automation/confluence-context.js";
 import type { GlobalConfig } from "../../src/config.js";
-import { ConfluenceClient } from "../../src/confluence/client.js";
+import { resolveConfluenceAuthOrThrow } from "../../src/confluence/auth.js";
 import { _resetGuideCatalogCacheForTests } from "../../src/confluence/guide-catalog.js";
 
 const baseConfig: GlobalConfig = {
@@ -12,6 +13,14 @@ const baseConfig: GlobalConfig = {
   trackerNativeStatusCodeReview: "Code Review",
   jiraCookieBrowser: "chrome",
 };
+
+function newClient(
+  config: GlobalConfig,
+  fetchImpl: typeof fetch,
+  sleepImpl?: (ms: number) => Promise<void>,
+): ConfluenceClient {
+  return new ConfluenceClient({ ...resolveConfluenceAuthOrThrow(config), fetchImpl, sleepImpl });
+}
 
 describe("extractCandidateUrls", () => {
   it("extracts every http(s) URL from free text", () => {
@@ -46,6 +55,7 @@ describe("buildWorkerConfluenceContext", () => {
           JSON.stringify({
             id: "999",
             title: "Guides",
+            version: { number: 1 },
             body: {
               storage: {
                 representation: "storage",
@@ -64,15 +74,15 @@ describe("buildWorkerConfluenceContext", () => {
           JSON.stringify({
             id: "222",
             title: "Runbook",
+            version: { number: 1, when: "2024-05-01T00:00:00.000Z" },
             body: { storage: { representation: "storage", value: "<p>Do this.</p>" } },
-            version: { when: "2024-05-01T00:00:00.000Z" },
           }),
           { status: 200 },
         );
       }
       throw new Error(`unexpected fetch: ${url}`);
     });
-    const client = new ConfluenceClient({ config, fetchImpl });
+    const client = newClient(config, fetchImpl);
 
     const result = await buildWorkerConfluenceContext(client, config, {
       summary: "Fix the thing",
@@ -94,7 +104,7 @@ describe("buildWorkerConfluenceContext", () => {
   });
 
   it("returns empty results (never throws) when the guide index is unconfigured and no links are present", async () => {
-    const client = new ConfluenceClient({ config: baseConfig, fetchImpl: vi.fn() });
+    const client = newClient(baseConfig, vi.fn());
     const result = await buildWorkerConfluenceContext(client, baseConfig, {
       summary: "Fix the thing",
       description: "No links here.",
@@ -109,7 +119,7 @@ describe("buildWorkerConfluenceContext", () => {
       confluenceGuideIndexUrl: "https://example.atlassian.net/wiki/spaces/ENG/pages/999/Guides",
     };
     const fetchImpl = vi.fn(async () => new Response("boom", { status: 500, statusText: "Internal Server Error" }));
-    const client = new ConfluenceClient({ config, fetchImpl, sleepImpl: async () => {} });
+    const client = newClient(config, fetchImpl, async () => {});
 
     const result = await buildWorkerConfluenceContext(client, config, {
       summary: "Fix the thing",

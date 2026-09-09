@@ -1,5 +1,5 @@
+import type { ConfluenceClient } from "@davindermahal/confluence-client";
 import type { GlobalConfig } from "../config.js";
-import type { ConfluenceClient } from "../confluence/client.js";
 import { fetchConfluencePages } from "../tools/fetch-confluence-pages.js";
 import { listGuides } from "../tools/list-guides.js";
 import type { WorkerConfluenceContext } from "./result-file.js";

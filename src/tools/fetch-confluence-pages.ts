@@ -1,6 +1,10 @@
+import {
+  extractPageIdFromUrl,
+  fetchPageByUrl,
+  storageToPlainText,
+  type ConfluenceClient,
+} from "@davindermahal/confluence-client";
 import type { GlobalConfig } from "../config.js";
-import { extractPageIdFromUrl, fetchPageByUrl, type ConfluenceClient } from "../confluence/client.js";
-import { storageToPlainText } from "../confluence/storage-text.js";
 
 export interface FetchConfluencePagesResultEntry {
   url: string;
@@ -57,8 +61,8 @@ export async function fetchConfluencePages(
       results.push({
         url,
         title: page.title,
-        content: storageToPlainText(page.body.storage.value),
-        lastModified: page.version?.when,
+        content: storageToPlainText(page.storageBody),
+        lastModified: page.lastModified,
       });
     } catch (err) {
       results.push({ url, error: err instanceof Error ? err.message : String(err) });

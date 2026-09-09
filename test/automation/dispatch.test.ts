@@ -2,13 +2,14 @@ import { execFileSync } from "node:child_process";
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
+import { ConfluenceClient } from "@davindermahal/confluence-client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { type DispatchContext, dispatchWorker } from "../../src/automation/dispatch.js";
 import type { ProjectEntry } from "../../src/automation/registry.js";
 import { confluenceContextFilePath, contextFilePath, readConfluenceContext, readWorkerContext } from "../../src/automation/result-file.js";
 import type { AutomationSettings } from "../../src/automation/settings.js";
 import type { GlobalConfig } from "../../src/config.js";
-import { ConfluenceClient } from "../../src/confluence/client.js";
+import { resolveConfluenceAuthOrThrow } from "../../src/confluence/auth.js";
 import type { JiraIssue } from "../../src/jira/tags.js";
 
 const config: GlobalConfig = {
@@ -152,15 +153,15 @@ describe("dispatchWorker", () => {
           JSON.stringify({
             id: "222",
             title: "Runbook",
+            version: { number: 1, when: "2024-05-01T00:00:00.000Z" },
             body: { storage: { representation: "storage", value: "<p>Do this.</p>" } },
-            version: { when: "2024-05-01T00:00:00.000Z" },
           }),
           { status: 200 },
         );
       }
       throw new Error(`unexpected fetch: ${url}`);
     });
-    const confluenceClient = new ConfluenceClient({ config, fetchImpl });
+    const confluenceClient = new ConfluenceClient({ ...resolveConfluenceAuthOrThrow(config), fetchImpl });
     const launch = vi.fn().mockReturnValue({ pid: 1, logPath: "/fake/log" });
     const ctx: DispatchContext = { project, config, settings, stateRoot, launch, confluenceClient };
 
@@ -193,7 +194,7 @@ describe("dispatchWorker", () => {
 
   it("does not pre-fetch or write Confluence context for an implementation-phase launch", async () => {
     const fetchImpl = vi.fn();
-    const confluenceClient = new ConfluenceClient({ config, fetchImpl });
+    const confluenceClient = new ConfluenceClient({ ...resolveConfluenceAuthOrThrow(config), fetchImpl });
     const launch = vi.fn().mockReturnValue({ pid: 1, logPath: "/fake/log" });
     const ctx: DispatchContext = { project, config, settings, stateRoot, launch, confluenceClient };
 

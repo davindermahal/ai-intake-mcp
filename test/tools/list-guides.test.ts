@@ -1,6 +1,6 @@
+import { ConfluenceClient } from "@davindermahal/confluence-client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { GlobalConfig } from "../../src/config.js";
-import { ConfluenceClient } from "../../src/confluence/client.js";
 import { _resetGuideCatalogCacheForTests } from "../../src/confluence/guide-catalog.js";
 import { listGuides } from "../../src/tools/list-guides.js";
 
@@ -13,9 +13,19 @@ const baseConfig: GlobalConfig = {
   jiraCookieBrowser: "chrome",
 };
 
+function newClient(config: GlobalConfig, fetchImpl: typeof fetch): ConfluenceClient {
+  return new ConfluenceClient({
+    siteUrl: config.jiraSiteUrl,
+    email: config.jiraEmail,
+    apiToken: config.jiraApiToken ?? "",
+    fetchImpl,
+  });
+}
+
 const INDEX_PAGE_RESPONSE = {
   id: "999",
   title: "AI Agent Guides",
+  version: { number: 1 },
   body: {
     storage: {
       representation: "storage" as const,
@@ -42,7 +52,7 @@ afterEach(() => {
 describe("listGuides", () => {
   it("reports configured: false and does not call Confluence when the index URL is unset", async () => {
     const fetchImpl = vi.fn();
-    const client = new ConfluenceClient({ config: baseConfig, fetchImpl });
+    const client = newClient(baseConfig, fetchImpl);
     const result = await listGuides(client, baseConfig);
     expect(result).toEqual({ configured: false, guides: [] });
     expect(fetchImpl).not.toHaveBeenCalled();
@@ -54,7 +64,7 @@ describe("listGuides", () => {
       confluenceGuideIndexUrl: "https://example.atlassian.net/wiki/spaces/ENG/pages/999/Guides",
     };
     const fetchImpl = vi.fn(async () => new Response(JSON.stringify(INDEX_PAGE_RESPONSE), { status: 200 }));
-    const client = new ConfluenceClient({ config: configured, fetchImpl });
+    const client = newClient(configured, fetchImpl);
 
     const result = await listGuides(client, configured);
     expect(result.configured).toBe(true);
@@ -95,7 +105,7 @@ describe("listGuides", () => {
       },
     };
     const fetchImpl = vi.fn(async () => new Response(JSON.stringify(response), { status: 200 }));
-    const client = new ConfluenceClient({ config: configured, fetchImpl });
+    const client = newClient(configured, fetchImpl);
 
     const result = await listGuides(client, configured);
     expect(result.guides).toHaveLength(2);
@@ -109,7 +119,7 @@ describe("listGuides", () => {
       confluenceGuideIndexUrl: "https://example.atlassian.net/wiki/spaces/ENG/pages/999/Guides",
     };
     const fetchImpl = vi.fn(async () => new Response(JSON.stringify(INDEX_PAGE_RESPONSE), { status: 200 }));
-    const client = new ConfluenceClient({ config: configured, fetchImpl });
+    const client = newClient(configured, fetchImpl);
 
     await listGuides(client, configured);
     await listGuides(client, configured);
